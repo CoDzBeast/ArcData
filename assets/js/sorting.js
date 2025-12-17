@@ -41,6 +41,7 @@ function getSortValue(row, key) {
     case "HeadDep": return row.HeadDep ?? null;
     case "ArmorCons":
     case "Armor": return row.ArmorCons ?? null;
+    case "ArmorPen": return row.ArmorPenScore ?? null;
     case "ArmorBP": return row.ArmorBreakpointScore ?? null;
     case "Consistency": return row.ConsistencyScore ?? null;
     case "Vol": return row.Vol ?? null;

@@ -70,6 +70,12 @@ export function renderTable(list, onRowClick) {
     const headDepNormTxt = (typeof d.HeadDepNorm === "number") ? Math.round(d.HeadDepNorm * 100) / 100 : "-";
     const headDepBadge = d.HeadDepHigh ? " 🔺" : "";
     const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
+    const armorPenDeltaTxt = (typeof d.ArmorPenDelta === "number") ? `${(d.ArmorPenDelta * 100).toFixed(1)}%` : "-";
+    const armorPenSecondsTxt = (typeof d.ArmorPenDeltaSeconds === "number") ? `${d.ArmorPenDeltaSeconds.toFixed(2)}s` : "-";
+    const armorPenNormTxt = (typeof d.ArmorPenScore === "number") ? Math.round(d.ArmorPenScore * 100) / 100 : "-";
+    const armorPenCell = (armorPenDeltaTxt === "-")
+      ? "-"
+      : `${armorPenSecondsTxt}<div class="subtle">${armorPenDeltaTxt} / ${armorPenNormTxt} norm</div>`;
     const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
     const consTxt = (typeof d.ConsistencyScore === "number") ? Math.round(d.ConsistencyScore * 100) / 100 : "-";
     const bpTxt = (typeof d.ArmorBreakpointScore === "number") ? Math.round(d.ArmorBreakpointScore * 100) / 100 : "-";
@@ -90,6 +96,7 @@ export function renderTable(list, onRowClick) {
         <td>${rngTxt}</td>
         <td>${headDepTxt}${headDepBadge}${headDepNormTxt !== "-" ? `<div class="subtle">${headDepNormTxt}</div>` : ""}</td>
         <td>${armTxt}</td>
+        <td>${armorPenCell}</td>
         <td>${bpTxt}</td>
         <td>${consTxt}</td>
         <td>${volTxt}</td>
