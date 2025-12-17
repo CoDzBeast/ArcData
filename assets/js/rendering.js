@@ -52,6 +52,7 @@ export function renderTable(list, onRowClick) {
     const rngTxt = d.Range ? d.Range + "m" : "-";
     const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
     const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
+    const bpTxt = (typeof d.ArmorBreakpointScore === "number") ? Math.round(d.ArmorBreakpointScore * 100) / 100 : "-";
 
     return `
       <tr data-name="${escapeHtml(d.Name || '')}">
@@ -63,6 +64,7 @@ export function renderTable(list, onRowClick) {
         <td>${relTxt}</td>
         <td>${rngTxt}</td>
         <td>${armTxt}</td>
+        <td>${bpTxt}</td>
         <td>${volTxt}</td>
       </tr>
     `;
