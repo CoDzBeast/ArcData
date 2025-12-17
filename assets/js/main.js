@@ -2,13 +2,14 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness, critLeverage, distanceBandScores } from './metrics.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness, critLeverage, distanceBandScores, counterScore } from './metrics.js';
 import { safeNum, escapeHtml, normalize, invert01, stddev } from './utils.js';
 
 let rawData = [], chart;
 let lastSort = { key: "Score", dir: "desc" };
 let roleDominanceByName = {};
 let outlierByName = {};
+let counterByName = {};
 
 init();
 
@@ -220,6 +221,12 @@ function updateUI() {
     const skillCeiling01 = skillCeilParts.length
       ? (skillCeilParts.reduce((a, b) => a + b, 0) / skillCeilParts.length)
       : null;
+    const counter = counterScore({
+      headDepNorm: d.HeadDepNorm,
+      armorNorm: normalized.nArmor,
+      reloadNorm: normalized.nReloadPenalty,
+      killsPerMagNorm: normalized.nKillsPerMag
+    });
 
     return {
       ...d,
@@ -233,6 +240,8 @@ function updateUI() {
       SkillFloorScore: typeof skillFloor01 === "number" ? Math.round(skillFloor01 * 1000) / 10 : null,
       SkillCeilingScore01: skillCeiling01,
       SkillCeilingScore: typeof skillCeiling01 === "number" ? Math.round(skillCeiling01 * 1000) / 10 : null,
+      CounterScore01: counter.counterScore01,
+      CounterScore: counter.counterScore,
       Score: score,
       Score01: score01,
       DistanceBandScores: bandScores.scores,
@@ -241,6 +250,7 @@ function updateUI() {
   });
 
   applyRoleDominance(scored);
+  applyCounterRank(scored);
   const scoredWithOutliers = applyOutlierIndex(scored);
 
   outlierByName = scoredWithOutliers.reduce((acc, weapon) => {
@@ -248,6 +258,14 @@ function updateUI() {
       index: weapon.OutlierIndex,
       warning: weapon.OutlierWarning,
       categoryAverage: weapon.CategoryAverageScore
+    };
+    return acc;
+  }, {});
+  counterByName = scoredWithOutliers.reduce((acc, weapon) => {
+    acc[weapon.Name] = {
+      score: weapon.CounterScore,
+      rank: weapon.CounterRank,
+      top: weapon.CounterTop10
     };
     return acc;
   }, {});
@@ -372,6 +390,12 @@ function showDetails(name) {
   const outlierTxt = (typeof outlierInfo.index === "number") ? `${outlierInfo.index.toFixed(2)}σ` : "-";
   const outlierBadge = outlierInfo.warning ? "⚠️ Above Cat Avg" : "";
   const outlierAvgTxt = (typeof outlierInfo.categoryAverage === "number") ? outlierInfo.categoryAverage.toFixed(1) : "-";
+  const counterInfo = counterByName[d.Name] || {};
+  const counterScoreTxt = (typeof counter.counterScore === "number")
+    ? counter.counterScore.toFixed(1)
+    : (typeof counterInfo.score === "number" ? counterInfo.score.toFixed(1) : "-");
+  const counterRankTxt = (typeof counterInfo.rank === "number") ? `${counterInfo.rank.toFixed(1)}%` : "-";
+  const counterBadge = counterInfo.top ? "🛡️ Meta Counter" : "";
 
   const whole = rawData.map(w => {
     const c = w.Category || "Unknown";
@@ -451,6 +475,13 @@ function showDetails(name) {
   const { score, score01 } = computeScore(normalized);
   const bandScores = distanceBandScores(range, rangeScore, score01);
 
+  const counter = counterScore({
+    headDepNorm,
+    armorNorm: normalized.nArmor,
+    reloadNorm: normalized.nReloadPenalty,
+    killsPerMagNorm: normalized.nKillsPerMag
+  });
+
   const headshotFloor = invert01(headDepNorm);
   const killsPerMagNorm = normalize(killsPerMag, ranges.KillsPerMag.min, ranges.KillsPerMag.max);
   const skillFloorParts = [headshotFloor, normalized.nConsistency, killsPerMagNorm]
@@ -487,6 +518,7 @@ function showDetails(name) {
   const critLevNormTxt = (typeof critLevNorm === "number") ? Math.round(critLevNorm * 100) / 100 : "-";
 
   const bars = [
+    ["CounterScore", counter.counterScore01],
     ["TTK", normalized.nTTK],
     ["Sustain", normalized.nSustain],
     ["Handling", normalized.nHandling],
@@ -510,6 +542,8 @@ function showDetails(name) {
     <div style="margin-top:14px;">
       <div class="grid2">
         <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
+        <div class="kv"><b>CounterScore</b><span class="highlight">${counterScoreTxt}${counterBadge ? ` <span class="subtle">(${counterBadge})</span>` : ""}</span></div>
+        <div class="kv"><b>Counter Rank</b><span>${counterRankTxt}</span></div>
         <div class="kv"><b>Outlier Index</b><span>${outlierTxt}${outlierBadge ? ` <span class="warn-pill sm">${outlierBadge}</span>` : ""}</span></div>
         <div class="kv"><b>Category Avg (Score)</b><span>${outlierAvgTxt}</span></div>
         <div class="kv"><b>Skill Floor</b><span>${skillFloor01 !== null ? (skillFloor01 * 100).toFixed(1) : "-"}</span></div>
@@ -623,6 +657,20 @@ function applyRoleDominance(list) {
       item.RoleDominanceIndex = Math.round(pct * 10) / 10;
       item.RoleDominanceTop10 = idx < Math.max(1, Math.ceil(len * 0.1));
     });
+  });
+
+  return list;
+}
+
+function applyCounterRank(list) {
+  const ranked = list.filter((item) => typeof item.CounterScore01 === "number" && isFinite(item.CounterScore01));
+  ranked.sort((a, b) => (b.CounterScore01 ?? -Infinity) - (a.CounterScore01 ?? -Infinity));
+
+  const len = ranked.length;
+  ranked.forEach((item, idx) => {
+    const pct = (len <= 1) ? 100 : (1 - (idx / Math.max(len - 1, 1))) * 100;
+    item.CounterRank = Math.round(pct * 10) / 10;
+    item.CounterTop10 = idx < Math.max(1, Math.ceil(len * 0.1));
   });
 
   return list;
