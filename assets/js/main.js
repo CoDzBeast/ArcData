@@ -202,7 +202,7 @@ function updateUI() {
     }, ranges);
 
     const { score, score01 } = computeScore(normalized);
-    const bandScores = distanceBandScores(d.Range, d.RangeScore, maxRangeByCat[d.Category], score01);
+    const bandScores = distanceBandScores(d.Range, d.RangeScore, score01);
 
     return {
       ...d,
@@ -392,7 +392,7 @@ function showDetails(name) {
   }, ranges);
 
   const { score, score01 } = computeScore(normalized);
-  const bandScores = distanceBandScores(range, rangeScore, maxRange, score01);
+  const bandScores = distanceBandScores(range, rangeScore, score01);
 
   const firingMode = d['Firing Mode'] || 'N/A';
   const armorPenAttr = d['Armor Pen'] || 'N/A';
