@@ -3,152 +3,176 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arc Raiders Master Database</title>
+    <title>Arc Raiders | Weapon Analytics</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; }
-        .dashboard { max-width: 1200px; margin: auto; }
-        .controls { display: flex; gap: 20px; background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; }
-        select, button { padding: 10px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569; cursor: pointer; }
-        h1 { color: #38bdf8; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
-        th { background: #334155; color: #38bdf8; }
-        .best { color: #4ade80; font-weight: bold; }
+        :root { --neon-blue: #00d2ff; --neon-red: #ff0055; --bg: #050a14; --card: #0f172a; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: #e2e8f0; margin: 0; padding: 20px; line-height: 1.6; }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 2px; color: var(--neon-blue); }
+        .container { max-width: 1400px; margin: auto; }
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+        .card { background: var(--card); border: 1px solid #1e293b; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        .controls { display: flex; gap: 20px; flex-wrap: wrap; background: #1e293b; padding: 15px; border-radius: 10px; margin-bottom: 20px; align-items: center; }
+        select { background: #050a14; color: white; border: 1px solid var(--neon-blue); padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #334155; color: var(--neon-blue); }
+        td { padding: 12px; border-bottom: 1px solid #1e293b; }
+        tr:hover { background: #1e293b; cursor: pointer; }
+        .stat-val { font-weight: bold; color: #fff; }
+        .highlight { color: var(--neon-red); }
     </style>
 </head>
 <body>
-    <div class="dashboard">
-        <h1>Arc Raiders: Master Weapon Database</h1>
+    <div class="container">
+        <h1>Arc Raiders // Tactical Intel</h1>
         
         <div class="controls">
-            <div>
-                <label>Target Armor:</label>
-                <select id="armorLevel" onchange="updateView()">
-                    <option value="0">No Armor (0)</option>
-                    <option value="L">Light Armor (L)</option>
-                    <option value="M" selected>Medium Armor (M)</option>
-                    <option value="H">Heavy Armor (H)</option>
+            <div><label>Target Armor: </label>
+                <select id="armor" onchange="updateUI()">
+                    <option value="0">Unarmored (0)</option>
+                    <option value="L">Light (L)</option>
+                    <option value="M" selected>Medium (M)</option>
+                    <option value="H">Heavy (H)</option>
                 </select>
             </div>
-            <div>
-                <label>Weapon Class:</label>
-                <select id="categoryFilter" onchange="updateView()">
-                    <option value="All">All Categories</option>
+            <div><label>Hit Zone: </label>
+                <select id="zone" onchange="updateUI()">
+                    <option value="Body" selected>Body Shot</option>
+                    <option value="Head">Headshot</option>
+                    <option value="Leg">Leg Shot</option>
                 </select>
+            </div>
+            <div><label>Category: </label>
+                <select id="category" onchange="updateUI()"><option value="All">All Categories</option></select>
             </div>
         </div>
 
-        <div class="card">
-            <h3>Time to Kill (TTK) Comparison</h3>
-            <p><small>Based on selected armor level. Lower bars = faster kills.</small></p>
-            <canvas id="ttkChart"></canvas>
-        </div>
+        <div class="dashboard-grid">
+            <div class="main">
+                <div class="card">
+                    <h3>Performance Landscape (TTK vs STK)</h3>
+                    <canvas id="mainChart" height="120"></canvas>
+                </div>
+                <div class="card">
+                    <h3>Weapon Arsenal</h3>
+                    <div style="overflow-x:auto;">
+                        <table id="weaponTable">
+                            <thead>
+                                <tr>
+                                    <th>Weapon Name</th>
+                                    <th>DPS</th>
+                                    <th>STK</th>
+                                    <th>TTK</th>
+                                    <th>Reload</th>
+                                    <th>Mag</th>
+                                    <th>Range</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
-        <div class="card">
-            <h3>Weapon Specifications</h3>
-            <div style="overflow-x: auto;">
-                <table id="statTable">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>DPS</th>
-                            <th>Mag</th>
-                            <th>Reload</th>
-                            <th>Range</th>
-                            <th>Stability</th>
-                            <th>Weight</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
+            <div class="sidebar">
+                <div class="card" id="detailPanel">
+                    <h2 id="dName">Select a Weapon</h2>
+                    <p id="dCat" style="color:var(--neon-blue)">---</p>
+                    <div id="dStats">
+                        </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let rawData = [];
-        let chart;
+        let rawData = [], chart;
 
-        Papa.parse("cleaned_weapons_full.csv", {
-            download: true,
-            header: true,
-            dynamicTyping: true,
-            complete: function(results) {
+        Papa.parse("arc_raiders_final.csv", {
+            download: true, header: true, dynamicTyping: true,
+            complete: (results) => {
                 rawData = results.data.filter(d => d.Name);
-                setupFilters();
-                updateView();
+                initSelectors();
+                updateUI();
             }
         });
 
-        function setupFilters() {
+        function initSelectors() {
             const cats = [...new Set(rawData.map(d => d.Category))];
-            const select = document.getElementById('categoryFilter');
-            cats.forEach(c => {
-                let o = document.createElement('option');
-                o.value = o.innerHTML = c;
-                select.appendChild(o);
-            });
+            const sel = document.getElementById('category');
+            cats.forEach(c => { let o = document.createElement('option'); o.text = o.value = c; sel.add(o); });
         }
 
-        function updateView() {
-            const armor = document.getElementById('armorLevel').value;
-            const category = document.getElementById('categoryFilter').value;
+        function updateUI() {
+            const armor = document.getElementById('armor').value;
+            const zone = document.getElementById('zone').value;
+            const cat = document.getElementById('category').value;
             
-            let filtered = category === "All" ? rawData : rawData.filter(d => d.Category === category);
+            let filtered = cat === 'All' ? rawData : rawData.filter(d => d.Category === cat);
             
-            // Sort by the specific Armor TTK selected
-            filtered.sort((a, b) => (a[`Body_TTK_${armor}`] || 99) - (b[`Body_TTK_${armor}`] || 99));
+            // Primary sort by TTK for the selected zone/armor
+            const ttkKey = `${zone} TTK ${armor}`;
+            filtered.sort((a, b) => (a[ttkKey] || 99) - (b[ttkKey] || 99));
 
-            renderChart(filtered, armor);
-            renderTable(filtered);
+            renderChart(filtered, ttkKey);
+            renderTable(filtered, zone, armor);
+            if(filtered.length > 0) showDetails(filtered[0].Name);
         }
 
-        function renderChart(data, armor) {
-            const ctx = document.getElementById('ttkChart').getContext('2d');
+        function renderChart(list, key) {
+            const ctx = document.getElementById('mainChart').getContext('2d');
             if (chart) chart.destroy();
-
             chart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: data.map(d => d.Name),
-                    datasets: [
-                        {
-                            label: `Head TTK (${armor})`,
-                            data: data.map(d => d[`Head_TTK_${armor}`]),
-                            backgroundColor: '#38bdf8'
-                        },
-                        {
-                            label: `Body TTK (${armor})`,
-                            data: data.map(d => d[`Body_TTK_${armor}`]),
-                            backgroundColor: '#94a3b8'
-                        }
-                    ]
+                    labels: list.map(d => d.Name),
+                    datasets: [{
+                        label: 'Time to Kill (Seconds)',
+                        data: list.map(d => d[key]),
+                        backgroundColor: '#00d2ff',
+                        borderColor: '#00d2ff',
+                        borderWidth: 1
+                    }]
                 },
-                options: {
-                    indexAxis: 'y',
-                    scales: { x: { title: { display: true, text: 'Seconds to Kill' } } }
-                }
+                options: { scales: { y: { beginAtZero: true, grid: { color: '#1e293b' } } } }
             });
         }
 
-        function renderTable(data) {
-            const tbody = document.querySelector('#statTable tbody');
-            tbody.innerHTML = '';
-            data.forEach(d => {
-                const row = `<tr>
-                    <td>${d.Name}</td>
-                    <td>${d.DPS || '-'}</td>
-                    <td>${d.Mag_Size || '-'}</td>
-                    <td>${d.Reload_Time || '-'}s</td>
-                    <td>${d.Range || '-'}m</td>
-                    <td>${d.Stability || '-'}</td>
-                    <td>${d.Weight || '-'}</td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
+        function renderTable(list, zone, armor) {
+            const ttkKey = `${zone} TTK ${armor}`;
+            const stkKey = `${zone} STK ${armor}`;
+            const tbody = document.querySelector('#weaponTable tbody');
+            tbody.innerHTML = list.map(d => `
+                <tr onclick="showDetails('${d.Name}')">
+                    <td class="stat-val">${d.Name}</td>
+                    <td>${d.DPS}</td>
+                    <td>${d[stkKey] || '-'}</td>
+                    <td class="highlight">${d[ttkKey] ? d[ttkKey]+'s' : '-'}</td>
+                    <td>${d.Reload}s</td>
+                    <td>${d.Mag}</td>
+                    <td>${d.Range}m</td>
+                </tr>
+            `).join('');
+        }
+
+        function showDetails(name) {
+            const d = rawData.find(w => w.Name === name);
+            document.getElementById('dName').innerText = d.Name;
+            document.getElementById('dCat').innerText = d.Category + " | Rarity: " + d.R;
+            document.getElementById('dStats').innerHTML = `
+                <div style="margin-top:20px;">
+                    <p><b>Firing Mode:</b> ${d['Firing Mode']}</p>
+                    <p><b>Armor Pen:</b> ${d['Armor Pen']}</p>
+                    <hr style="border:0; border-top:1px solid #334155;">
+                    <p><b>Stability:</b> ${d.Stability}</p>
+                    <p><b>Agility:</b> ${d.Agility}</p>
+                    <p><b>Stealth:</b> ${d.Stealth}</p>
+                    <p><b>Weight:</b> ${d.Weight}</p>
+                    <h3 style="color:var(--neon-red);">$${d.Sell ? d.Sell.toLocaleString() : '0'}</h3>
+                </div>
+            `;
         }
     </script>
 </body>
