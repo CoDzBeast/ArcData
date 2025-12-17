@@ -1,5 +1,5 @@
 import { loadWeaponData } from './dataLoader.js';
-import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
+import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState, getWeights01 } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
 import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness, critLeverage, distanceBandScores, counterScore } from './metrics.js';
@@ -538,8 +538,21 @@ function showDetails(name) {
     .map(([label, val]) => `<div class="kv"><b>${label} Band</b><span>${typeof val === "number" ? val.toFixed(1) : '-'}</span></div>`)
     .join("");
 
+  const explanation = buildMetricContributionSummary(normalized, {
+    zone,
+    armor,
+    ttk,
+    sustain,
+    handling,
+    range,
+    reloadTaxVal,
+    armorCons
+  });
+  const summaryHtml = explanation ? `<div class="explanation">${escapeHtml(explanation)}</div>` : '';
+
   const statsHtml = `
     <div style="margin-top:14px;">
+      ${summaryHtml}
       <div class="grid2">
         <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>CounterScore</b><span class="highlight">${counterScoreTxt}${counterBadge ? ` <span class="subtle">(${counterBadge})</span>` : ""}</span></div>
@@ -625,6 +638,98 @@ function showDetails(name) {
     categoryText: `${category} | Rarity: ${d.R || 'Common'}`,
     statsHtml
   });
+}
+
+function buildMetricContributionSummary(normalized, context) {
+  const weights = getWeights01();
+  const contributions = [
+    { key: 'nTTK', value: normalized.nTTK, weight: weights.ttk },
+    { key: 'nSustain', value: normalized.nSustain, weight: weights.sustain },
+    { key: 'nHandling', value: normalized.nHandling, weight: weights.handling },
+    { key: 'nRange', value: normalized.nRange, weight: weights.range },
+    { key: 'nReloadPenalty', value: normalized.nReloadPenalty, weight: weights.reload },
+    { key: 'nArmor', value: normalized.nArmor, weight: weights.armor }
+  ];
+
+  const ranked = contributions
+    .filter(c => typeof c.value === 'number' && isFinite(c.value) && typeof c.weight === 'number' && c.weight > 0)
+    .map(c => ({ ...c, contribution: c.value * c.weight }))
+    .sort((a, b) => b.contribution - a.contribution)
+    .slice(0, 3);
+
+  const phrases = ranked
+    .map(c => describeContribution(c.key, normalized, context))
+    .filter(Boolean);
+
+  return phrases.length ? `${phrases.join(', ')}.` : '';
+}
+
+function describeContribution(key, normalized, context) {
+  const { zone, armor, ttk, sustain, handling, range, reloadTaxVal, armorCons } = context;
+
+  if (key === 'nTTK') {
+    const tone = pickTone(normalized.nTTK, ['blistering', 'fast', 'steady']);
+    const timeTxt = (typeof ttk === 'number') ? ` (${ttk.toFixed(2)}s)` : '';
+    return `${tone} ${zoneLabel(zone)} TTK vs ${armorLabel(armor)}${timeTxt}`;
+  }
+
+  if (key === 'nSustain') {
+    const tone = pickTone(normalized.nSustain, ['high', 'strong', 'solid']);
+    const sustainTxt = (typeof sustain === 'number') ? ` (${sustain.toFixed(1)} DPS)` : '';
+    return `${tone} sustained DPS${sustainTxt}`;
+  }
+
+  if (key === 'nHandling') {
+    const tone = pickTone(normalized.nHandling, ['snappy', 'clean', 'steady']);
+    const handlingTxt = (typeof handling === 'number') ? ` (${handling.toFixed(1)} handling)` : '';
+    return `${tone} handling${handlingTxt}`;
+  }
+
+  if (key === 'nRange') {
+    const band = (!range || range < 35) ? 'close-range' : (range < 60 ? 'mid-range' : 'long-range');
+    const rangeTxt = (typeof range === 'number') ? ` (${Math.round(range)}m)` : '';
+    return `${band} coverage${rangeTxt}`;
+  }
+
+  if (key === 'nReloadPenalty' || key === 'nReload') {
+    const tone = pickTone(normalized.nReloadPenalty, ['minimal', 'low', 'manageable']);
+    const downtime = (typeof reloadTaxVal === 'number') ? ` (${Math.round(reloadTaxVal * 100)}% downtime)` : '';
+    return `${tone} reload risk${downtime}`;
+  }
+
+  if (key === 'nArmor') {
+    const tone = pickTone(normalized.nArmor, ['strong', 'steady', 'stable']);
+    const armorTxt = (typeof armorCons === 'number') ? ` (${Math.round(armorCons * 100)}% consistency)` : '';
+    return `${tone} vs heavy armor${armorTxt}`;
+  }
+
+  return null;
+}
+
+function pickTone(score, [high, mid, base]) {
+  if (typeof score !== 'number') return base;
+  if (score >= 0.82) return high;
+  if (score >= 0.64) return mid;
+  return base;
+}
+
+function armorLabel(code) {
+  switch(code) {
+    case '0': return 'unarmored';
+    case 'L': return 'light';
+    case 'M': return 'medium';
+    case 'H': return 'heavy armor';
+    default: return 'armor';
+  }
+}
+
+function zoneLabel(zone) {
+  switch(zone) {
+    case 'Head': return 'headshot';
+    case 'Leg': return 'leg-shot';
+    case 'Body': return 'body-shot';
+    default: return 'overall weighted';
+  }
 }
 
 function updateChartTitle(zone, armor, metric) {
