@@ -84,6 +84,10 @@ export function renderTable(list, onRowClick) {
       : `${armorPenSecondsTxt}<div class="subtle">${armorPenDeltaTxt} / ${armorPenNormTxt} norm</div>`;
     const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
     const consTxt = (typeof d.ConsistencyScore === "number") ? Math.round(d.ConsistencyScore * 100) / 100 : "-";
+    const skillFloorTxt = (typeof d.SkillFloorScore === "number") ? d.SkillFloorScore.toFixed(1) : "-";
+    const skillFloorCell = (skillFloorTxt === "-")
+      ? "-"
+      : `${skillFloorTxt}<div class="subtle">${typeof d.KillsPerMagNorm === "number" ? `K/Mag ${Math.round(d.KillsPerMagNorm * 100) / 100}` : "Head/Cons/K/Mag"}</div>`;
     const bpTxt = (typeof d.ArmorBreakpointScore === "number") ? Math.round(d.ArmorBreakpointScore * 100) / 100 : "-";
 
     return `
@@ -106,6 +110,7 @@ export function renderTable(list, onRowClick) {
         <td>${armTxt}</td>
         <td>${armorPenCell}</td>
         <td>${bpTxt}</td>
+        <td>${skillFloorCell}</td>
         <td>${consTxt}</td>
         <td>${volTxt}</td>
       </tr>
