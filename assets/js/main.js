@@ -65,7 +65,13 @@ function updateUI() {
     const ttk = getZoneTTK(d, zone, armor);
     const stk = getZoneSTK(d, zone, armor);
     const reload = safeNum(d.Reload);
+    const mag = safeNum(d.Mag);
     const reloadTaxVal = reloadTax(reload, ttk);
+
+    const engagementsPerMag = (typeof mag === "number" && mag > 0 && typeof stk === "number" && stk > 0)
+      ? Math.floor(mag / stk)
+      : null;
+    const reloadEveryKill = (typeof engagementsPerMag === "number") ? engagementsPerMag <= 1 : null;
 
     const sustain = (zone === "Overall")
       ? sustainedDpsApprox(d, null, null, ttk, stk)
@@ -89,6 +95,8 @@ function updateUI() {
       STK: stk,
       Reload: reload,
       ReloadTax: reloadTaxVal,
+      EngagementCapacity: engagementsPerMag,
+      ReloadEveryKill: reloadEveryKill,
       Sustain: sustain,
       Handling: handling,
       ArmorCons: armorCons,
@@ -150,9 +158,15 @@ function showDetails(name) {
   const ttk = getZoneTTK(d, zone, armor);
   const stk = getZoneSTK(d, zone, armor);
   const reload = safeNum(d.Reload);
+  const mag = safeNum(d.Mag);
   const range = safeNum(d.Range);
   const DPS = safeNum(d.DPS);
   const reloadTaxVal = reloadTax(reload, ttk);
+
+  const engagementsPerMag = (typeof mag === "number" && mag > 0 && typeof stk === "number" && stk > 0)
+    ? Math.floor(mag / stk)
+    : null;
+  const reloadEveryKill = (typeof engagementsPerMag === "number") ? engagementsPerMag <= 1 : null;
 
   const handling = handlingIndex(d);
   const armorCons = armorConsistency(d, zone);
@@ -250,6 +264,8 @@ function showDetails(name) {
         <div class="kv"><b>DPS</b><span>${DPS ?? "-"}</span></div>
         <div class="kv"><b>Sustained DPS</b><span>${typeof sustain==="number" ? sustain.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Reload</b><span>${reload ? reload.toFixed(2)+"s" : "-"}</span></div>
+        <div class="kv"><b>Engagements/Mag</b><span>${typeof engagementsPerMag==="number" ? engagementsPerMag : "-"}</span></div>
+        <div class="kv"><b>Reload Each Kill?</b><span>${reloadEveryKill === null ? "-" : (reloadEveryKill ? "Yes" : "No")}</span></div>
         <div class="kv"><b>Reload Tax</b><span>${typeof reloadTaxVal==="number" ? (reloadTaxVal*100).toFixed(1)+"%" : "-"}</span></div>
         <div class="kv"><b>Reload Penalty (Norm)</b><span>${typeof normalized.nReloadPenalty==="number" ? Math.round(normalized.nReloadPenalty*100)/100 : "-"}</span></div>
         <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
