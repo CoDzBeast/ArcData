@@ -51,6 +51,12 @@ function updateUI() {
 
   const maxRangeByCat = {};
   const maxDmgCycleByCat = {};
+  const handlingValues = rawData
+    .map(handlingIndex)
+    .filter(v => typeof v === "number" && isFinite(v));
+  const handlingRange = handlingValues.length
+    ? { min: Math.min(...handlingValues), max: Math.max(...handlingValues) }
+    : { min: 0, max: 1 };
   rawData.forEach(d => {
     const c = d.Category || "Unknown";
 
@@ -90,6 +96,9 @@ function updateUI() {
       : sustainedDpsApprox(d, ttkKey, stkKey);
 
     const handling = handlingIndex(d);
+    const handlingNorm = (typeof handling === "number")
+      ? normalize(handling, handlingRange.min, handlingRange.max)
+      : null;
     const armorCons = armorConsistency(d, zone);
     const vol = ttkVolatility(d, zone);
     const armorBreak = armorBreakpoint(d);
@@ -111,6 +120,8 @@ function updateUI() {
       ReloadEveryKill: reloadEveryKill,
       Sustain: sustain,
       Handling: handling,
+      HandlingIndex: handling,
+      HandlingIndexNorm: handlingNorm,
       ArmorCons: armorCons,
       Vol: vol,
       DamagePerCycle: dmgPerCycle,
@@ -124,6 +135,7 @@ function updateUI() {
   });
 
   const ranges = buildRanges(computed);
+  ranges.Handling = handlingRange;
 
   const scored = computed.map(d => {
     const normalized = normalizeMetrics({
@@ -163,6 +175,12 @@ function showDetails(name) {
   const { armor, zone } = getControlState();
 
   const headshotStats = headshotDependencyStats(rawData, armor);
+  const handlingValues = rawData
+    .map(handlingIndex)
+    .filter(v => typeof v === "number" && isFinite(v));
+  const handlingRange = handlingValues.length
+    ? { min: Math.min(...handlingValues), max: Math.max(...handlingValues) }
+    : { min: 0, max: 1 };
 
   const d = rawData.find(w => w.Name === name);
   if (!d) return;
@@ -184,6 +202,9 @@ function showDetails(name) {
   const reloadEveryKill = (typeof engagementsPerMag === "number") ? engagementsPerMag <= 1 : null;
 
   const handling = handlingIndex(d);
+  const handlingNorm = (typeof handling === "number")
+    ? normalize(handling, handlingRange.min, handlingRange.max)
+    : null;
   const armorCons = armorConsistency(d, zone);
   const armorBreak = armorBreakpoint(d);
   const vol = ttkVolatility(d, zone);
@@ -314,6 +335,7 @@ function showDetails(name) {
         <div class="kv"><b>Armor Pen</b><span>${armorPen}</span></div>
         <div class="kv"><b>Crit Multi</b><span>${crit}x</span></div>
         <div class="kv"><b>Handling Index</b><span>${handling ? handling.toFixed(1) : "-"}</span></div>
+        <div class="kv"><b>Handling (Norm)</b><span>${typeof handlingNorm === "number" ? Math.round(handlingNorm * 100) / 100 : "-"}</span></div>
       </div>
 
       <div class="bars">

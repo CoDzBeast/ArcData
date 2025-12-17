@@ -36,6 +36,7 @@ function getSortValue(row, key) {
     case "Sustain": return row.Sustain ?? null;
     case "Engage": return row.EngagementCapacity ?? null;
     case "Reload": return row.Reload ?? null;
+    case "Handling": return row.HandlingIndexNorm ?? row.Handling ?? null;
     case "Range": return row.Range ?? null;
     case "HeadDep": return row.HeadDep ?? null;
     case "ArmorCons":

@@ -58,6 +58,9 @@ export function renderTable(list, onRowClick) {
     const relTaxTxt = (typeof d.ReloadTax === "number") ? (d.ReloadTax * 100).toFixed(1) + "%" : "-";
     const relPenaltyTxt = (typeof d.nReloadPenalty === "number") ? Math.round(d.nReloadPenalty * 100) / 100 : "-";
     const relCell = `${relTxt}${relTaxTxt !== "-" ? `<div class="subtle">${relTaxTxt} tax / ${relPenaltyTxt} norm</div>` : ""}`;
+    const handlingTxt = (typeof d.HandlingIndex === "number") ? Math.round(d.HandlingIndex * 10) / 10 : "-";
+    const handlingNormTxt = (typeof d.HandlingIndexNorm === "number") ? Math.round(d.HandlingIndexNorm * 100) / 100 : "-";
+    const handlingCell = `${handlingTxt}${handlingNormTxt !== "-" ? `<div class="subtle">${handlingNormTxt} norm</div>` : ""}`;
     const rngTxt = d.Range ? d.Range + "m" : "-";
     const headDepTxt = (typeof d.HeadDep === "number") ? d.HeadDep.toFixed(2) : "-";
     const headDepNormTxt = (typeof d.HeadDepNorm === "number") ? Math.round(d.HeadDepNorm * 100) / 100 : "-";
@@ -77,6 +80,7 @@ export function renderTable(list, onRowClick) {
         <td>${susTxt}</td>
         <td>${engageCell}</td>
         <td>${relCell}</td>
+        <td>${handlingCell}</td>
         <td>${rngTxt}</td>
         <td>${headDepTxt}${headDepBadge}${headDepNormTxt !== "-" ? `<div class="subtle">${headDepNormTxt}</div>` : ""}</td>
         <td>${armTxt}</td>
