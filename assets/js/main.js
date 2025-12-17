@@ -93,11 +93,15 @@ function updateUI() {
     const mag = safeNum(d.Mag);
     const reloadTaxVal = reloadTax(reload, ttk);
     const weight = safeNum(d.Weight);
+    const agility = safeNum(d.Agility);
     const weightFactor = (typeof weight === "number")
       ? normalize(weight, weightRange.min, weightRange.max)
       : null;
     const exposureTime = (typeof overallTTK === "number" && typeof weightFactor === "number")
       ? overallTTK * (1 + weightFactor)
+      : null;
+    const mobilityCost = (typeof weight === "number" && typeof agility === "number" && agility > 0 && typeof overallTTK === "number")
+      ? (weight / agility) * overallTTK
       : null;
 
     const engagementsPerMag = (typeof mag === "number" && mag > 0 && typeof stk === "number" && stk > 0)
@@ -140,6 +144,7 @@ function updateUI() {
       Vol: vol,
       WeightFactor: weightFactor,
       ExposureTime: exposureTime,
+      MobilityCost: mobilityCost,
       DamagePerCycle: dmgPerCycle,
       DamagePerCycleNorm: dmgPerCycleNorm,
       HeadDep: headDep,
@@ -164,7 +169,8 @@ function updateUI() {
       armorCons: d.ArmorCons,
       armorBreakAvg: d.ArmorBreakAvg,
       volatility: d.Vol,
-      exposureTime: d.ExposureTime
+      exposureTime: d.ExposureTime,
+      mobilityCost: d.MobilityCost
     }, ranges);
 
     const { score, score01 } = computeScore(normalized);
@@ -175,6 +181,7 @@ function updateUI() {
       ConsistencyScore: normalized.nConsistency,
       ArmorBreakpointScore: normalized.nArmorBreak,
       ExposureTimeNorm: normalized.nExposure,
+      MobilityCostNorm: normalized.nMobilityCost,
       Score: score,
       Score01: score01
     };
@@ -215,11 +222,15 @@ function showDetails(name) {
   const dmgPerCycle = damagePerCycle(d);
   const reloadTaxVal = reloadTax(reload, ttk);
   const weight = safeNum(d.Weight);
+  const agility = safeNum(d.Agility);
   const weightFactor = (typeof weight === "number")
     ? normalize(weight, weightRange.min, weightRange.max)
     : null;
   const exposureTime = (typeof overallTTK === "number" && typeof weightFactor === "number")
     ? overallTTK * (1 + weightFactor)
+    : null;
+  const mobilityCost = (typeof weight === "number" && typeof agility === "number" && agility > 0 && typeof overallTTK === "number")
+    ? (weight / agility) * overallTTK
     : null;
 
   const engagementsPerMag = (typeof mag === "number" && mag > 0 && typeof stk === "number" && stk > 0)
@@ -269,12 +280,16 @@ function showDetails(name) {
     const wReload = safeNum(w.Reload);
     const wReloadTax = reloadTax(wReload, wTTK);
     const wWeight = safeNum(w.Weight);
+    const wAgility = safeNum(w.Agility);
     const wWeightFactor = (typeof wWeight === "number")
       ? normalize(wWeight, weightRange.min, weightRange.max)
       : null;
     const wOverallTTK = getZoneTTK(w, "Overall", armor);
     const wExposureTime = (typeof wOverallTTK === "number" && typeof wWeightFactor === "number")
       ? wOverallTTK * (1 + wWeightFactor)
+      : null;
+    const wMobilityCost = (typeof wWeight === "number" && typeof wAgility === "number" && wAgility > 0 && typeof wOverallTTK === "number")
+      ? (wWeight / wAgility) * wOverallTTK
       : null;
 
     const wSustain = (zone === "Overall")
@@ -291,12 +306,23 @@ function showDetails(name) {
       ArmorBreakAvg: armorBreakpoint(w).avgDelta,
       RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null,
       Vol: ttkVolatility(w, zone),
-      ExposureTime: wExposureTime
+      ExposureTime: wExposureTime,
+      MobilityCost: wMobilityCost
     };
   });
 
   const ranges = buildRanges(whole.map(x => ({
-    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ReloadTax: x.ReloadTax, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg, Vol: x.Vol, ExposureTime: x.ExposureTime
+    TTK: x.TTK,
+    Sustain: x.Sustain,
+    Handling: x.Handling,
+    RangeScore: x.RangeScore,
+    Reload: x.Reload,
+    ReloadTax: x.ReloadTax,
+    ArmorCons: x.ArmorCons,
+    ArmorBreakAvg: x.ArmorBreakAvg,
+    Vol: x.Vol,
+    ExposureTime: x.ExposureTime,
+    MobilityCost: x.MobilityCost
   })));
 
   const normalized = normalizeMetrics({
@@ -309,7 +335,8 @@ function showDetails(name) {
     armorCons,
     armorBreakAvg: armorBreak.avgDelta,
     volatility: vol,
-    exposureTime
+    exposureTime,
+    mobilityCost
   }, ranges);
 
   const { score } = computeScore(normalized);
@@ -327,6 +354,8 @@ function showDetails(name) {
   ].map(([label,val]) => `<div class="kv"><b>${label}</b><span>${typeof val === "number" ? val.toFixed(2) : '-'}</span></div>`).join("");
   const exposureTxt = exposureTime ? exposureTime.toFixed(2) + "s" : "-";
   const exposureNormTxt = (typeof normalized.nExposure === "number") ? Math.round(normalized.nExposure * 100) / 100 : "-";
+  const mobilityCostTxt = (typeof mobilityCost === "number") ? mobilityCost.toFixed(2) + "s" : "-";
+  const mobilityCostNormTxt = (typeof normalized.nMobilityCost === "number") ? Math.round(normalized.nMobilityCost * 100) / 100 : "-";
   const weightFactorTxt = (typeof weightFactor === "number") ? Math.round(weightFactor * 100) / 100 : "-";
 
   const bars = [
@@ -339,6 +368,7 @@ function showDetails(name) {
     ["Armor", normalized.nArmor],
     ["Armor BP", normalized.nArmorBreak],
     ["Exposure (Inv)", normalized.nExposure],
+    ["Mobility Cost (Inv)", normalized.nMobilityCost],
   ];
 
   const statsHtml = `
@@ -348,6 +378,8 @@ function showDetails(name) {
         <div class="kv"><b>${zone} TTK vs ${armor}</b><span>${ttk ? ttk.toFixed(2)+"s" : "-"}</span></div>
         <div class="kv"><b>Exposure Time</b><span>${exposureTxt}</span></div>
         <div class="kv"><b>Exposure (Norm)</b><span>${exposureNormTxt}</span></div>
+        <div class="kv"><b>Mobility Cost/Kill</b><span>${mobilityCostTxt}</span></div>
+        <div class="kv"><b>Mobility Cost (Norm)</b><span>${mobilityCostNormTxt}</span></div>
         <div class="kv"><b>DPS</b><span>${DPS ?? "-"}</span></div>
         <div class="kv"><b>Sustained DPS</b><span>${typeof sustain==="number" ? sustain.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Damage / Cycle</b><span>${typeof dmgPerCycle==="number" ? Math.round(dmgPerCycle) : "-"}</span></div>
