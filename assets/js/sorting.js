@@ -47,12 +47,13 @@ function getSortValue(row, key) {
 
 export function computeScore(weightedMetrics) {
   const wts = getWeights01();
+  const reloadComponent = weightedMetrics.nReloadPenalty ?? weightedMetrics.nReload ?? 0;
   const score01 =
     ((weightedMetrics.nTTK ?? 0) * wts.ttk) +
     ((weightedMetrics.nSustain ?? 0) * wts.sustain) +
     ((weightedMetrics.nHandling ?? 0) * wts.handling) +
     ((weightedMetrics.nRange ?? 0) * wts.range) +
-    ((weightedMetrics.nReload ?? 0) * wts.reload) +
+    (reloadComponent * wts.reload) +
     ((weightedMetrics.nArmor ?? 0) * wts.armor);
 
   return { score01, score: Math.round(Math.min(Math.max(score01,0),1) * 1000) / 10 };

@@ -49,6 +49,9 @@ export function renderTable(list, onRowClick) {
     const dpsTxt = d.DPS ? d.DPS : "-";
     const susTxt = (typeof d.Sustain === "number") ? d.Sustain.toFixed(1) : "-";
     const relTxt = d.Reload ? d.Reload.toFixed(2) + "s" : "-";
+    const relTaxTxt = (typeof d.ReloadTax === "number") ? (d.ReloadTax * 100).toFixed(1) + "%" : "-";
+    const relPenaltyTxt = (typeof d.nReloadPenalty === "number") ? Math.round(d.nReloadPenalty * 100) / 100 : "-";
+    const relCell = `${relTxt}${relTaxTxt !== "-" ? `<div class="subtle">${relTaxTxt} tax / ${relPenaltyTxt} norm</div>` : ""}`;
     const rngTxt = d.Range ? d.Range + "m" : "-";
     const headDepTxt = (typeof d.HeadDep === "number") ? d.HeadDep.toFixed(2) : "-";
     const headDepNormTxt = (typeof d.HeadDepNorm === "number") ? Math.round(d.HeadDepNorm * 100) / 100 : "-";
@@ -65,7 +68,7 @@ export function renderTable(list, onRowClick) {
         <td>${ttkTxt}</td>
         <td>${dpsTxt}</td>
         <td>${susTxt}</td>
-        <td>${relTxt}</td>
+        <td>${relCell}</td>
         <td>${rngTxt}</td>
         <td>${headDepTxt}${headDepBadge}${headDepNormTxt !== "-" ? `<div class="subtle">${headDepNormTxt}</div>` : ""}</td>
         <td>${armTxt}</td>
