@@ -55,6 +55,7 @@ export function renderTable(list, onRowClick) {
     const headDepBadge = d.HeadDepHigh ? " 🔺" : "";
     const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
     const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
+    const consTxt = (typeof d.ConsistencyScore === "number") ? Math.round(d.ConsistencyScore * 100) / 100 : "-";
     const bpTxt = (typeof d.ArmorBreakpointScore === "number") ? Math.round(d.ArmorBreakpointScore * 100) / 100 : "-";
 
     return `
@@ -69,6 +70,7 @@ export function renderTable(list, onRowClick) {
         <td>${headDepTxt}${headDepBadge}${headDepNormTxt !== "-" ? `<div class="subtle">${headDepNormTxt}</div>` : ""}</td>
         <td>${armTxt}</td>
         <td>${bpTxt}</td>
+        <td>${consTxt}</td>
         <td>${volTxt}</td>
       </tr>
     `;
