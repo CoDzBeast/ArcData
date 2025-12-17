@@ -10,18 +10,21 @@
     <style>
         :root { --neon-blue: #00d2ff; --neon-red: #ff0055; --bg: #050a14; --card: #0f172a; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: #e2e8f0; margin: 0; padding: 20px; line-height: 1.6; }
-        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 2px; color: var(--neon-blue); }
+        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 2px; color: var(--neon-blue); margin-top: 0; }
         .container { max-width: 1400px; margin: auto; }
         .dashboard-grid { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+        @media (max-width: 1000px) { .dashboard-grid { grid-template-columns: 1fr; } }
         .card { background: var(--card); border: 1px solid #1e293b; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
         .controls { display: flex; gap: 20px; flex-wrap: wrap; background: #1e293b; padding: 15px; border-radius: 10px; margin-bottom: 20px; align-items: center; }
-        select { background: #050a14; color: white; border: 1px solid var(--neon-blue); padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        select, input { background: #050a14; color: white; border: 1px solid var(--neon-blue); padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        input { cursor: text; width: 200px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-        th { text-align: left; padding: 12px; border-bottom: 2px solid #334155; color: var(--neon-blue); }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid #334155; color: var(--neon-blue); text-transform: uppercase; font-size: 0.75rem; }
         td { padding: 12px; border-bottom: 1px solid #1e293b; }
         tr:hover { background: #1e293b; cursor: pointer; }
         .stat-val { font-weight: bold; color: #fff; }
-        .highlight { color: var(--neon-red); }
+        .highlight { color: var(--neon-red); font-weight: bold; }
+        hr { border: 0; border-top: 1px solid #334155; margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -29,7 +32,12 @@
         <h1>Arc Raiders // Tactical Intel</h1>
         
         <div class="controls">
-            <div><label>Target Armor: </label>
+            <div>
+                <label>Search: </label>
+                <input type="text" id="searchInput" placeholder="Weapon name..." onkeyup="updateUI()">
+            </div>
+            <div>
+                <label>Target Armor: </label>
                 <select id="armor" onchange="updateUI()">
                     <option value="0">Unarmored (0)</option>
                     <option value="L">Light (L)</option>
@@ -37,23 +45,27 @@
                     <option value="H">Heavy (H)</option>
                 </select>
             </div>
-            <div><label>Hit Zone: </label>
+            <div>
+                <label>Hit Zone: </label>
                 <select id="zone" onchange="updateUI()">
                     <option value="Body" selected>Body Shot</option>
                     <option value="Head">Headshot</option>
                     <option value="Leg">Leg Shot</option>
                 </select>
             </div>
-            <div><label>Category: </label>
-                <select id="category" onchange="updateUI()"><option value="All">All Categories</option></select>
+            <div>
+                <label>Category: </label>
+                <select id="category" onchange="updateUI()">
+                    <option value="All">All Categories</option>
+                </select>
             </div>
         </div>
 
         <div class="dashboard-grid">
             <div class="main">
                 <div class="card">
-                    <h3>Performance Landscape (TTK vs STK)</h3>
-                    <canvas id="mainChart" height="120"></canvas>
+                    <h3>Performance Landscape (TTK Seconds)</h3>
+                    <canvas id="mainChart" height="100"></canvas>
                 </div>
                 <div class="card">
                     <h3>Weapon Arsenal</h3>
@@ -61,7 +73,7 @@
                         <table id="weaponTable">
                             <thead>
                                 <tr>
-                                    <th>Weapon Name</th>
+                                    <th>Weapon</th>
                                     <th>DPS</th>
                                     <th>STK</th>
                                     <th>TTK</th>
@@ -79,9 +91,10 @@
             <div class="sidebar">
                 <div class="card" id="detailPanel">
                     <h2 id="dName">Select a Weapon</h2>
-                    <p id="dCat" style="color:var(--neon-blue)">---</p>
+                    <p id="dCat" style="color:var(--neon-blue); font-weight:bold;">---</p>
                     <div id="dStats">
-                        </div>
+                        <p>Click a weapon in the table to see detailed stats, rarity, and sell value.</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -90,89 +103,136 @@
     <script>
         let rawData = [], chart;
 
-        Papa.parse("arc_raiders_final.csv", {
-            download: true, header: true, dynamicTyping: true,
+        // Use a relative path so it works on GitHub Pages automatically
+        const csvFile = "arc_raiders_final.csv";
+
+        Papa.parse(csvFile, {
+            download: true,
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
             complete: (results) => {
-                rawData = results.data.filter(d => d.Name);
+                rawData = results.data.filter(d => d.Name && d.Name !== "Name");
+                console.log("Data Loaded successfully:", rawData);
                 initSelectors();
                 updateUI();
+            },
+            error: (err) => {
+                console.error("Error loading CSV:", err);
+                document.querySelector('.main').innerHTML = `<div class="card"><h3 style="color:red">Error: Could not load ${csvFile}</h3><p>Make sure the file is in your GitHub repository and named exactly "arc_raiders_final.csv".</p></div>`;
             }
         });
 
         function initSelectors() {
-            const cats = [...new Set(rawData.map(d => d.Category))];
+            const cats = [...new Set(rawData.map(d => d.Category))].filter(Boolean);
             const sel = document.getElementById('category');
-            cats.forEach(c => { let o = document.createElement('option'); o.text = o.value = c; sel.add(o); });
+            cats.sort().forEach(c => { 
+                let o = document.createElement('option'); 
+                o.text = o.value = c; 
+                sel.add(o); 
+            });
         }
 
         function updateUI() {
             const armor = document.getElementById('armor').value;
             const zone = document.getElementById('zone').value;
             const cat = document.getElementById('category').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
             
-            let filtered = cat === 'All' ? rawData : rawData.filter(d => d.Category === cat);
+            let filtered = rawData.filter(d => {
+                const matchCat = (cat === 'All' || d.Category === cat);
+                const matchSearch = d.Name.toLowerCase().includes(search);
+                return matchCat && matchSearch;
+            });
             
-            // Primary sort by TTK for the selected zone/armor
             const ttkKey = `${zone} TTK ${armor}`;
-            filtered.sort((a, b) => (a[ttkKey] || 99) - (b[ttkKey] || 99));
+            const stkKey = `${zone} STK ${armor}`;
+            
+            // Sort by TTK (Ascending - lower is better)
+            filtered.sort((a, b) => {
+                let valA = a[ttkKey] === null || a[ttkKey] === undefined ? 999 : a[ttkKey];
+                let valB = b[ttkKey] === null || b[ttkKey] === undefined ? 999 : b[ttkKey];
+                return valA - valB;
+            });
 
             renderChart(filtered, ttkKey);
-            renderTable(filtered, zone, armor);
-            if(filtered.length > 0) showDetails(filtered[0].Name);
+            renderTable(filtered, ttkKey, stkKey);
+            
+            if(filtered.length > 0 && search === "") {
+                // showDetails(filtered[0].Name); // Optional: auto-select first
+            }
         }
 
         function renderChart(list, key) {
             const ctx = document.getElementById('mainChart').getContext('2d');
+            const chartData = list.slice(0, 15); // Show top 15 for readability
+            
             if (chart) chart.destroy();
             chart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: list.map(d => d.Name),
+                    labels: chartData.map(d => d.Name),
                     datasets: [{
-                        label: 'Time to Kill (Seconds)',
-                        data: list.map(d => d[key]),
+                        label: 'Time to Kill (Lower is Better)',
+                        data: chartData.map(d => d[key]),
                         backgroundColor: '#00d2ff',
                         borderColor: '#00d2ff',
                         borderWidth: 1
                     }]
                 },
-                options: { scales: { y: { beginAtZero: true, grid: { color: '#1e293b' } } } }
+                options: { 
+                    responsive: true,
+                    scales: { 
+                        y: { beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#fff' } },
+                        x: { ticks: { color: '#fff', font: { size: 10 } } }
+                    },
+                    plugins: { legend: { labels: { color: '#fff' } } }
+                }
             });
         }
 
-        function renderTable(list, zone, armor) {
-            const ttkKey = `${zone} TTK ${armor}`;
-            const stkKey = `${zone} STK ${armor}`;
+        function renderTable(list, ttkKey, stkKey) {
             const tbody = document.querySelector('#weaponTable tbody');
             tbody.innerHTML = list.map(d => `
-                <tr onclick="showDetails('${d.Name}')">
+                <tr onclick="showDetails('${d.Name.replace(/'/g, "\\'")}')">
                     <td class="stat-val">${d.Name}</td>
-                    <td>${d.DPS}</td>
+                    <td>${d.DPS || '-'}</td>
                     <td>${d[stkKey] || '-'}</td>
-                    <td class="highlight">${d[ttkKey] ? d[ttkKey]+'s' : '-'}</td>
-                    <td>${d.Reload}s</td>
-                    <td>${d.Mag}</td>
-                    <td>${d.Range}m</td>
+                    <td class="highlight">${d[ttkKey] ? d[ttkKey].toFixed(2) + 's' : '-'}</td>
+                    <td>${d.Reload ? d.Reload + 's' : '-'}</td>
+                    <td>${d.Mag || '-'}</td>
+                    <td>${d.Range ? d.Range + 'm' : '-'}</td>
                 </tr>
             `).join('');
         }
 
         function showDetails(name) {
             const d = rawData.find(w => w.Name === name);
+            if(!d) return;
+
             document.getElementById('dName').innerText = d.Name;
-            document.getElementById('dCat').innerText = d.Category + " | Rarity: " + d.R;
+            document.getElementById('dCat').innerText = `${d.Category} | Rarity: ${d.R || 'Common'}`;
+            
             document.getElementById('dStats').innerHTML = `
                 <div style="margin-top:20px;">
-                    <p><b>Firing Mode:</b> ${d['Firing Mode']}</p>
-                    <p><b>Armor Pen:</b> ${d['Armor Pen']}</p>
-                    <hr style="border:0; border-top:1px solid #334155;">
-                    <p><b>Stability:</b> ${d.Stability}</p>
-                    <p><b>Agility:</b> ${d.Agility}</p>
-                    <p><b>Stealth:</b> ${d.Stealth}</p>
-                    <p><b>Weight:</b> ${d.Weight}</p>
-                    <h3 style="color:var(--neon-red);">$${d.Sell ? d.Sell.toLocaleString() : '0'}</h3>
+                    <p><b>Firing Mode:</b> ${d['Firing Mode'] || 'N/A'}</p>
+                    <p><b>Armor Pen:</b> ${d['Armor Pen'] || 'N/A'}</p>
+                    <p><b>Crit Multi:</b> ${d['Crit Multi'] || '1.0'}x</p>
+                    <hr>
+                    <p><b>Stability:</b> ${d.Stability || '0'}</p>
+                    <p><b>Agility:</b> ${d.Agility || '0'}</p>
+                    <p><b>Stealth:</b> ${d.Stealth || '0'}</p>
+                    <p><b>Weight:</b> ${d.Weight || '0'}</p>
+                    <hr>
+                    <h3 style="color:var(--neon-red);">Sell Value: $${d.Sell ? d.Sell.toLocaleString() : '0'}</h3>
+                    ${d.Notes ? `<p style="font-size: 0.8rem; font-style: italic; color: #94a3b8;">Note: ${d.Notes}</p>` : ''}
                 </div>
             `;
+            
+            // Scroll sidebar to top on mobile
+            if (window.innerWidth < 1000) {
+                document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth' });
+            }
         }
     </script>
 </body>
