@@ -1,239 +1,805 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arc Raiders | Weapon Analytics</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;600&display=swap" rel="stylesheet">
-    <style>
-        :root { --neon-blue: #00d2ff; --neon-red: #ff0055; --bg: #050a14; --card: #0f172a; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg); color: #e2e8f0; margin: 0; padding: 20px; line-height: 1.6; }
-        h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 2px; color: var(--neon-blue); margin-top: 0; }
-        .container { max-width: 1400px; margin: auto; }
-        .dashboard-grid { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
-        @media (max-width: 1000px) { .dashboard-grid { grid-template-columns: 1fr; } }
-        .card { background: var(--card); border: 1px solid #1e293b; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
-        .controls { display: flex; gap: 20px; flex-wrap: wrap; background: #1e293b; padding: 15px; border-radius: 10px; margin-bottom: 20px; align-items: center; }
-        select, input { background: #050a14; color: white; border: 1px solid var(--neon-blue); padding: 8px 15px; border-radius: 5px; cursor: pointer; }
-        input { cursor: text; width: 200px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-        th { text-align: left; padding: 12px; border-bottom: 2px solid #334155; color: var(--neon-blue); text-transform: uppercase; font-size: 0.75rem; }
-        td { padding: 12px; border-bottom: 1px solid #1e293b; }
-        tr:hover { background: #1e293b; cursor: pointer; }
-        .stat-val { font-weight: bold; color: #fff; }
-        .highlight { color: var(--neon-red); font-weight: bold; }
-        hr { border: 0; border-top: 1px solid #334155; margin: 20px 0; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Arc Raiders | Weapon Analytics</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root { --neon-blue: #00d2ff; --neon-red: #ff0055; --bg: #050a14; --card: #0f172a; --muted:#94a3b8; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: #e2e8f0; margin: 0; padding: 20px; line-height: 1.6; }
+    h1, h2, h3 { font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 2px; color: var(--neon-blue); margin-top: 0; }
+    .container { max-width: 1400px; margin: auto; }
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 420px; gap: 20px; }
+    @media (max-width: 1100px) { .dashboard-grid { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card); border: 1px solid #1e293b; padding: 22px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); margin-bottom: 20px; }
+    .controls { display: flex; gap: 14px; flex-wrap: wrap; background: #1e293b; padding: 14px; border-radius: 10px; margin-bottom: 20px; align-items: center; }
+
+    select, input, button { background: #050a14; color: white; border: 1px solid var(--neon-blue); padding: 8px 12px; border-radius: 8px; }
+    input { width: 220px; }
+    button { cursor: pointer; }
+    button.secondary { border-color:#334155; color:#cbd5e1; }
+    button.secondary:hover { border-color: var(--neon-blue); }
+    .pill { display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border-radius:999px; border:1px solid #334155; background:#0b1222; color:#cbd5e1; font-size: 0.85rem; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.85rem; }
+    th { text-align: left; padding: 10px; border-bottom: 2px solid #334155; color: var(--neon-blue); text-transform: uppercase; font-size: 0.72rem; letter-spacing: .08em; user-select:none; }
+    th.sortable { cursor:pointer; }
+    td { padding: 10px; border-bottom: 1px solid #1e293b; }
+    tr:hover { background: #1e293b; cursor: pointer; }
+
+    .stat-val { font-weight: bold; color: #fff; }
+    .highlight { color: var(--neon-red); font-weight: bold; }
+    hr { border: 0; border-top: 1px solid #334155; margin: 16px 0; }
+
+    .subtle { color: var(--muted); font-size: 0.9rem; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kv { display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid #1e293b; border-radius:12px; background:#0b1222; }
+    .kv b { color:#e2e8f0; }
+    .kv span { color:#cbd5e1; }
+
+    .bars { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+    .barRow { display:grid; grid-template-columns: 120px 1fr 54px; gap:10px; align-items:center; }
+    .barTrack { height:10px; background:#0b1222; border:1px solid #1e293b; border-radius:999px; overflow:hidden; }
+    .barFill { height:100%; background: var(--neon-blue); width:0%; }
+    .barRow .lbl { color:#cbd5e1; font-size:0.85rem; }
+    .barRow .val { color:#e2e8f0; text-align:right; font-variant-numeric: tabular-nums; }
+
+    .accordion { border:1px solid #334155; border-radius: 12px; overflow:hidden; background:#0b1222; }
+    .accHead { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; cursor:pointer; }
+    .accHead b { color:#e2e8f0; }
+    .accBody { display:none; padding: 12px; border-top:1px solid #1e293b; }
+    .accBody.open { display:block; }
+    .sliderRow { display:grid; grid-template-columns: 140px 1fr 56px; gap:10px; align-items:center; margin:10px 0; }
+    .sliderRow label { color:#cbd5e1; font-size:0.9rem; }
+    .sliderRow output { color:#e2e8f0; text-align:right; font-variant-numeric: tabular-nums; }
+
+    .note { font-size:0.82rem; color:#94a3b8; margin-top:8px; }
+    .warn { color:#fbbf24; font-size:0.85rem; }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>Arc Raiders // Tactical Intel</h1>
-        
-        <div class="controls">
-            <div>
-                <label>Search: </label>
-                <input type="text" id="searchInput" placeholder="Weapon name..." onkeyup="updateUI()">
-            </div>
-            <div>
-                <label>Target Armor: </label>
-                <select id="armor" onchange="updateUI()">
-                    <option value="0">Unarmored (0)</option>
-                    <option value="L">Light (L)</option>
-                    <option value="M" selected>Medium (M)</option>
-                    <option value="H">Heavy (H)</option>
-                </select>
-            </div>
-            <div>
-                <label>Hit Zone: </label>
-                <select id="zone" onchange="updateUI()">
-                    <option value="Body" selected>Body Shot</option>
-                    <option value="Head">Headshot</option>
-                    <option value="Leg">Leg Shot</option>
-                </select>
-            </div>
-            <div>
-                <label>Category: </label>
-                <select id="category" onchange="updateUI()">
-                    <option value="All">All Categories</option>
-                </select>
-            </div>
-        </div>
+  <div class="container">
+    <h1>Arc Raiders // Tactical Intel</h1>
 
-        <div class="dashboard-grid">
-            <div class="main">
-                <div class="card">
-                    <h3>Performance Landscape (TTK Seconds)</h3>
-                    <canvas id="mainChart" height="100"></canvas>
-                </div>
-                <div class="card">
-                    <h3>Weapon Arsenal</h3>
-                    <div style="overflow-x:auto;">
-                        <table id="weaponTable">
-                            <thead>
-                                <tr>
-                                    <th>Weapon</th>
-                                    <th>DPS</th>
-                                    <th>STK</th>
-                                    <th>TTK</th>
-                                    <th>Reload</th>
-                                    <th>Mag</th>
-                                    <th>Range</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <div class="controls">
+      <div>
+        <label>Search: </label>
+        <input type="text" id="searchInput" placeholder="Weapon name..." onkeyup="updateUI()">
+      </div>
 
-            <div class="sidebar">
-                <div class="card" id="detailPanel">
-                    <h2 id="dName">Select a Weapon</h2>
-                    <p id="dCat" style="color:var(--neon-blue); font-weight:bold;">---</p>
-                    <div id="dStats">
-                        <p>Click a weapon in the table to see detailed stats, rarity, and sell value.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div>
+        <label>Target Armor: </label>
+        <select id="armor" onchange="updateUI()">
+          <option value="0">Unarmored (0)</option>
+          <option value="L">Light (L)</option>
+          <option value="M" selected>Medium (M)</option>
+          <option value="H">Heavy (H)</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Hit Zone: </label>
+        <select id="zone" onchange="updateUI()">
+          <option value="Body" selected>Body Shot</option>
+          <option value="Head">Headshot</option>
+          <option value="Leg">Leg Shot</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Category: </label>
+        <select id="category" onchange="updateUI()">
+          <option value="All">All Categories</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Score Mode: </label>
+        <select id="scoreMode" onchange="applyPresetWeights(); updateUI();">
+          <option value="META" selected>Meta (Balanced)</option>
+          <option value="CQC">CQC (Close)</option>
+          <option value="MID">Mid-Range (AR)</option>
+          <option value="LONG">Long-Range (DMR/Sniper)</option>
+          <option value="CUSTOM">Custom (Sliders)</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Chart: </label>
+        <select id="chartMetric" onchange="updateUI()">
+          <option value="SCORE" selected>Score (Higher is Better)</option>
+          <option value="TTK">TTK (Lower is Better)</option>
+        </select>
+      </div>
+
+      <div class="pill" id="statusPill">Loading…</div>
     </div>
 
-    <script>
-        let rawData = [], chart;
+    <div class="dashboard-grid">
+      <div class="main">
+        <div class="card">
+          <h3 id="chartTitle">Performance Landscape</h3>
+          <canvas id="mainChart" height="110"></canvas>
+          <div class="note">
+            Score is a normalized weighted composite (0–100) over the currently filtered set. For category fairness, Range is normalized within category.
+          </div>
+        </div>
 
-        // Use a relative path so it works on GitHub Pages automatically
-        const csvFile = "arc_raiders_final.csv";
-
-        Papa.parse(csvFile, {
-            download: true,
-            header: true,
-            dynamicTyping: true,
-            skipEmptyLines: true,
-            complete: (results) => {
-                rawData = results.data.filter(d => d.Name && d.Name !== "Name");
-                console.log("Data Loaded successfully:", rawData);
-                initSelectors();
-                updateUI();
-            },
-            error: (err) => {
-                console.error("Error loading CSV:", err);
-                document.querySelector('.main').innerHTML = `<div class="card"><h3 style="color:red">Error: Could not load ${csvFile}</h3><p>Make sure the file is in your GitHub repository and named exactly "arc_raiders_final.csv".</p></div>`;
-            }
-        });
-
-        function initSelectors() {
-            const cats = [...new Set(rawData.map(d => d.Category))].filter(Boolean);
-            const sel = document.getElementById('category');
-            cats.sort().forEach(c => { 
-                let o = document.createElement('option'); 
-                o.text = o.value = c; 
-                sel.add(o); 
-            });
-        }
-
-        function updateUI() {
-            const armor = document.getElementById('armor').value;
-            const zone = document.getElementById('zone').value;
-            const cat = document.getElementById('category').value;
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            
-            let filtered = rawData.filter(d => {
-                const matchCat = (cat === 'All' || d.Category === cat);
-                const matchSearch = d.Name.toLowerCase().includes(search);
-                return matchCat && matchSearch;
-            });
-            
-            const ttkKey = `${zone} TTK ${armor}`;
-            const stkKey = `${zone} STK ${armor}`;
-            
-            // Sort by TTK (Ascending - lower is better)
-            filtered.sort((a, b) => {
-                let valA = a[ttkKey] === null || a[ttkKey] === undefined ? 999 : a[ttkKey];
-                let valB = b[ttkKey] === null || b[ttkKey] === undefined ? 999 : b[ttkKey];
-                return valA - valB;
-            });
-
-            renderChart(filtered, ttkKey);
-            renderTable(filtered, ttkKey, stkKey);
-            
-            if(filtered.length > 0 && search === "") {
-                // showDetails(filtered[0].Name); // Optional: auto-select first
-            }
-        }
-
-        function renderChart(list, key) {
-            const ctx = document.getElementById('mainChart').getContext('2d');
-            const chartData = list.slice(0, 15); // Show top 15 for readability
-            
-            if (chart) chart.destroy();
-            chart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: chartData.map(d => d.Name),
-                    datasets: [{
-                        label: 'Time to Kill (Lower is Better)',
-                        data: chartData.map(d => d[key]),
-                        backgroundColor: '#00d2ff',
-                        borderColor: '#00d2ff',
-                        borderWidth: 1
-                    }]
-                },
-                options: { 
-                    responsive: true,
-                    scales: { 
-                        y: { beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#fff' } },
-                        x: { ticks: { color: '#fff', font: { size: 10 } } }
-                    },
-                    plugins: { legend: { labels: { color: '#fff' } } }
-                }
-            });
-        }
-
-        function renderTable(list, ttkKey, stkKey) {
-            const tbody = document.querySelector('#weaponTable tbody');
-            tbody.innerHTML = list.map(d => `
-                <tr onclick="showDetails('${d.Name.replace(/'/g, "\\'")}')">
-                    <td class="stat-val">${d.Name}</td>
-                    <td>${d.DPS || '-'}</td>
-                    <td>${d[stkKey] || '-'}</td>
-                    <td class="highlight">${d[ttkKey] ? d[ttkKey].toFixed(2) + 's' : '-'}</td>
-                    <td>${d.Reload ? d.Reload + 's' : '-'}</td>
-                    <td>${d.Mag || '-'}</td>
-                    <td>${d.Range ? d.Range + 'm' : '-'}</td>
+        <div class="card">
+          <h3>Weapon Arsenal</h3>
+          <div style="overflow-x:auto;">
+            <table id="weaponTable">
+              <thead>
+                <tr>
+                  <th class="sortable" data-sort="Name">Weapon</th>
+                  <th class="sortable" data-sort="Score">Score</th>
+                  <th class="sortable" data-sort="TTK">TTK</th>
+                  <th class="sortable" data-sort="DPS">DPS</th>
+                  <th class="sortable" data-sort="Sustain">Sustain</th>
+                  <th class="sortable" data-sort="Reload">Reload</th>
+                  <th class="sortable" data-sort="Range">Range</th>
+                  <th class="sortable" data-sort="ArmorCons">Armor</th>
+                  <th class="sortable" data-sort="Vol">Vol</th>
                 </tr>
-            `).join('');
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="note">
+            Armor = consistency vs armor scaling. Vol = TTK volatility across 0/L/M/H (lower is better).
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="card">
+          <div class="accordion">
+            <div class="accHead" onclick="toggleWeights()">
+              <b>Weights & Model</b>
+              <span class="subtle" id="weightsHint">click to expand</span>
+            </div>
+            <div class="accBody" id="weightsBody">
+              <div class="subtle" style="margin-bottom:10px;">
+                Presets auto-fill sliders. Switching to <b>Custom</b> will lock your values.
+              </div>
+
+              <div class="sliderRow">
+                <label>TTK (inverse)</label>
+                <input type="range" min="0" max="100" value="30" id="w_ttk" oninput="onWeightChange()">
+                <output id="o_ttk">30</output>
+              </div>
+              <div class="sliderRow">
+                <label>Sustained DPS</label>
+                <input type="range" min="0" max="100" value="20" id="w_sustain" oninput="onWeightChange()">
+                <output id="o_sustain">20</output>
+              </div>
+              <div class="sliderRow">
+                <label>Handling</label>
+                <input type="range" min="0" max="100" value="15" id="w_handling" oninput="onWeightChange()">
+                <output id="o_handling">15</output>
+              </div>
+              <div class="sliderRow">
+                <label>Range</label>
+                <input type="range" min="0" max="100" value="15" id="w_range" oninput="onWeightChange()">
+                <output id="o_range">15</output>
+              </div>
+              <div class="sliderRow">
+                <label>Reload (inverse)</label>
+                <input type="range" min="0" max="100" value="10" id="w_reload" oninput="onWeightChange()">
+                <output id="o_reload">10</output>
+              </div>
+              <div class="sliderRow">
+                <label>Armor Consistency</label>
+                <input type="range" min="0" max="100" value="10" id="w_armor" oninput="onWeightChange()">
+                <output id="o_armor">10</output>
+              </div>
+
+              <div class="note">
+                The system automatically re-normalizes your weights to sum to 1.0 when scoring.
+              </div>
+
+              <div style="display:flex; gap:10px; margin-top:12px;">
+                <button class="secondary" onclick="applyPresetWeights(true); updateUI();">Reset Preset</button>
+                <button class="secondary" onclick="document.getElementById('scoreMode').value='CUSTOM'; updateUI();">Use Custom</button>
+              </div>
+
+              <div class="warn" style="margin-top:10px;">
+                Sustained DPS is approximated from TTK+STK to infer firing cadence where possible (no explicit ROF in CSV).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="detailPanel">
+          <h2 id="dName">Select a Weapon</h2>
+          <p id="dCat" style="color:var(--neon-blue); font-weight:bold;">---</p>
+          <div id="dStats">
+            <p class="subtle">Click a weapon in the table to see scoring breakdown, derived metrics, rarity, and sell value.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let rawData = [], chart;
+    let lastSort = { key: "Score", dir: "desc" };
+
+    // Relative path for GitHub Pages
+    const csvFile = "arc_raiders_final.csv";
+
+    Papa.parse(csvFile, {
+      download: true,
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        rawData = (results.data || []).filter(d => d.Name && d.Name !== "Name");
+        initSelectors();
+        applyPresetWeights(true);
+        bindSortHeaders();
+        updateUI();
+      },
+      error: (err) => {
+        console.error("Error loading CSV:", err);
+        document.querySelector('.main').innerHTML =
+          `<div class="card"><h3 style="color:red">Error: Could not load ${csvFile}</h3>
+            <p>Make sure the file is in your GitHub repo and named exactly <b>"arc_raiders_final.csv"</b>.</p></div>`;
+      }
+    });
+
+    function setStatus(text) {
+      const pill = document.getElementById("statusPill");
+      pill.textContent = text;
+    }
+
+    function initSelectors() {
+      const cats = [...new Set(rawData.map(d => d.Category))].filter(Boolean);
+      const sel = document.getElementById('category');
+      cats.sort().forEach(c => {
+        let o = document.createElement('option');
+        o.text = o.value = c;
+        sel.add(o);
+      });
+    }
+
+    function toggleWeights() {
+      const body = document.getElementById("weightsBody");
+      body.classList.toggle("open");
+      document.getElementById("weightsHint").textContent = body.classList.contains("open") ? "click to collapse" : "click to expand";
+    }
+
+    function bindSortHeaders() {
+      document.querySelectorAll("#weaponTable th.sortable").forEach(th => {
+        th.addEventListener("click", () => {
+          const key = th.getAttribute("data-sort");
+          if (!key) return;
+          if (lastSort.key === key) lastSort.dir = (lastSort.dir === "asc" ? "desc" : "asc");
+          else { lastSort.key = key; lastSort.dir = (key === "Name" ? "asc" : "desc"); }
+          updateUI();
+        });
+      });
+    }
+
+    function onWeightChange() {
+      // if user touches sliders, switch to CUSTOM
+      const mode = document.getElementById("scoreMode");
+      if (mode.value !== "CUSTOM") mode.value = "CUSTOM";
+      syncWeightOutputs();
+      updateUI();
+    }
+
+    function syncWeightOutputs() {
+      const map = [
+        ["w_ttk","o_ttk"],
+        ["w_sustain","o_sustain"],
+        ["w_handling","o_handling"],
+        ["w_range","o_range"],
+        ["w_reload","o_reload"],
+        ["w_armor","o_armor"]
+      ];
+      map.forEach(([w,o]) => document.getElementById(o).textContent = document.getElementById(w).value);
+    }
+
+    function applyPresetWeights(force=false) {
+      const mode = document.getElementById("scoreMode").value;
+
+      // Only auto-apply when in presets, or forced reset.
+      if (!force && mode === "CUSTOM") return;
+
+      const presets = {
+        META: { ttk:30, sustain:20, handling:15, range:15, reload:10, armor:10 },
+        CQC:  { ttk:35, sustain:10, handling:25, range:5,  reload:20, armor:5  },
+        MID:  { ttk:25, sustain:20, handling:15, range:25, reload:10, armor:5  },
+        LONG: { ttk:15, sustain:5,  handling:15, range:35, reload:10, armor:20 }
+      };
+
+      const p = presets[mode] || presets.META;
+      document.getElementById("w_ttk").value = p.ttk;
+      document.getElementById("w_sustain").value = p.sustain;
+      document.getElementById("w_handling").value = p.handling;
+      document.getElementById("w_range").value = p.range;
+      document.getElementById("w_reload").value = p.reload;
+      document.getElementById("w_armor").value = p.armor;
+      syncWeightOutputs();
+    }
+
+    // ---------- Metric helpers ----------
+    const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+    const safeNum = (x) => (x === null || x === undefined || Number.isNaN(x)) ? null : Number(x);
+
+    function stddev(nums) {
+      const arr = nums.filter(n => typeof n === "number" && isFinite(n));
+      if (arr.length < 2) return null;
+      const mean = arr.reduce((a,b)=>a+b,0) / arr.length;
+      const v = arr.reduce((a,b)=>a + (b-mean)*(b-mean), 0) / (arr.length - 1);
+      return Math.sqrt(v);
+    }
+
+    function normalize(val, min, max) {
+      if (val === null || val === undefined) return null;
+      if (max === min) return 0.5;
+      return clamp((val - min) / (max - min), 0, 1);
+    }
+
+    function invert01(x) {
+      if (x === null || x === undefined) return null;
+      return 1 - x;
+    }
+
+    // Approx sustained DPS:
+    // - infer shots/sec from STK+TTK: sps ≈ (STK - 1) / TTK
+    // - estimate time to empty mag: (Mag - 1) / sps
+    // - during firing, DPS is "DPS"
+    // - damage_per_mag ≈ DPS * time_firing
+    // - sustained ≈ damage_per_mag / (time_firing + reload)
+    function sustainedDpsApprox(d, ttkKey, stkKey) {
+      const DPS = safeNum(d.DPS);
+      const ttk = safeNum(d[ttkKey]);
+      const stk = safeNum(d[stkKey]);
+      const mag = safeNum(d.Mag);
+      const reload = safeNum(d.Reload);
+
+      if (!DPS || !reload || !mag) return null;
+      if (!ttk || !stk || stk <= 1) {
+        // fallback: assume 10 shots/sec for time-to-empty approximation
+        const spsFallback = 10;
+        const timeFiring = (mag - 1) / spsFallback;
+        if (!isFinite(timeFiring) || timeFiring <= 0) return null;
+        const dmgMag = DPS * timeFiring;
+        return dmgMag / (timeFiring + reload);
+      }
+
+      const sps = (stk - 1) / ttk;
+      if (!isFinite(sps) || sps <= 0) return null;
+
+      const timeFiring = (mag - 1) / sps;
+      if (!isFinite(timeFiring) || timeFiring <= 0) return null;
+
+      const dmgMag = DPS * timeFiring;
+      return dmgMag / (timeFiring + reload);
+    }
+
+    function handlingIndex(d) {
+      const stab = safeNum(d.Stability) ?? 0;
+      const agil = safeNum(d.Agility) ?? 0;
+      const stlh = safeNum(d.Stealth) ?? 0;
+      return (stab * 0.4) + (agil * 0.4) + (stlh * 0.2);
+    }
+
+    function armorConsistency(d, zone) {
+      const ttk0 = safeNum(d[`${zone} TTK 0`]);
+      const ttkH = safeNum(d[`${zone} TTK H`]);
+      if (!ttk0 || !ttkH) return null;
+      const cons = 1 - ((ttkH - ttk0) / ttk0);
+      return clamp(cons, 0, 1);
+    }
+
+    function ttkVolatility(d, zone) {
+      const arr = [
+        safeNum(d[`${zone} TTK 0`]),
+        safeNum(d[`${zone} TTK L`]),
+        safeNum(d[`${zone} TTK M`]),
+        safeNum(d[`${zone} TTK H`]),
+      ];
+      return stddev(arr);
+    }
+
+    function getWeights01() {
+      const w = {
+        ttk: Number(document.getElementById("w_ttk").value),
+        sustain: Number(document.getElementById("w_sustain").value),
+        handling: Number(document.getElementById("w_handling").value),
+        range: Number(document.getElementById("w_range").value),
+        reload: Number(document.getElementById("w_reload").value),
+        armor: Number(document.getElementById("w_armor").value),
+      };
+      const sum = Object.values(w).reduce((a,b)=>a+b,0) || 1;
+      Object.keys(w).forEach(k => w[k] = w[k] / sum);
+      return w;
+    }
+
+    // ---------- Main update ----------
+    function updateUI() {
+      if (!rawData.length) { setStatus("No data"); return; }
+
+      const armor = document.getElementById('armor').value;
+      const zone = document.getElementById('zone').value;
+      const cat = document.getElementById('category').value;
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const chartMetric = document.getElementById("chartMetric").value;
+
+      // keys for current scenario
+      const ttkKey = `${zone} TTK ${armor}`;
+      const stkKey = `${zone} STK ${armor}`;
+
+      // filter
+      let filtered = rawData.filter(d => {
+        const matchCat = (cat === 'All' || d.Category === cat);
+        const matchSearch = (d.Name || "").toLowerCase().includes(search);
+        return matchCat && matchSearch;
+      });
+
+      // Precompute category max range for fairness
+      const maxRangeByCat = {};
+      rawData.forEach(d => {
+        const c = d.Category || "Unknown";
+        const r = safeNum(d.Range);
+        if (!r) return;
+        maxRangeByCat[c] = Math.max(maxRangeByCat[c] || 0, r);
+      });
+
+      // Compute raw derived metrics for filtered list
+      const computed = filtered.map(d => {
+        const ttk = safeNum(d[ttkKey]);
+        const reload = safeNum(d.Reload);
+        const range = safeNum(d.Range);
+        const category = d.Category || "Unknown";
+
+        const sustain = sustainedDpsApprox(d, ttkKey, stkKey);
+        const handling = handlingIndex(d);
+        const armorCons = armorConsistency(d, zone);
+        const vol = ttkVolatility(d, zone);
+
+        const rangeScore = (range && maxRangeByCat[category]) ? (range / maxRangeByCat[category]) : null;
+        const reloadTax = (reload && ttk) ? (reload / (reload + ttk)) : null;
+
+        return {
+          raw: d,
+          Name: d.Name,
+          Category: category,
+
+          TTK: ttk,
+          DPS: safeNum(d.DPS),
+          Reload: reload,
+          Range: range,
+          Mag: safeNum(d.Mag),
+
+          Sustain: sustain,
+          Handling: handling,
+          ArmorCons: armorCons,
+          Vol: vol,
+          RangeScore: rangeScore,
+          ReloadTax: reloadTax
+        };
+      });
+
+      // Build normalization ranges from computed (over current filtered set)
+      const ranges = buildRanges(computed);
+
+      // Weights
+      const w = getWeights01();
+
+      // Score each row (0..1), then 0..100
+      computed.forEach(x => {
+        // Normalize each component
+        const nTTK = invert01(normalize(x.TTK, ranges.TTK.min, ranges.TTK.max));
+        const nSustain = normalize(x.Sustain, ranges.Sustain.min, ranges.Sustain.max);
+        const nHandling = normalize(x.Handling, ranges.Handling.min, ranges.Handling.max);
+        const nRange = normalize(x.RangeScore, ranges.RangeScore.min, ranges.RangeScore.max);
+        const nReload = invert01(normalize(x.Reload, ranges.Reload.min, ranges.Reload.max));
+        const nArmor = normalize(x.ArmorCons, ranges.ArmorCons.min, ranges.ArmorCons.max);
+
+        // Handle missing values: treat as 0.0 contribution (conservative)
+        const cTTK = nTTK ?? 0;
+        const cSustain = nSustain ?? 0;
+        const cHandling = nHandling ?? 0;
+        const cRange = nRange ?? 0;
+        const cReload = nReload ?? 0;
+        const cArmor = nArmor ?? 0;
+
+        const score01 =
+          (cTTK * w.ttk) +
+          (cSustain * w.sustain) +
+          (cHandling * w.handling) +
+          (cRange * w.range) +
+          (cReload * w.reload) +
+          (cArmor * w.armor);
+
+        x.Score01 = clamp(score01, 0, 1);
+        x.Score = Math.round(x.Score01 * 1000) / 10; // one decimal (0..100)
+        x._components = { nTTK, nSustain, nHandling, nRange, nReload, nArmor };
+      });
+
+      // sort
+      computed.sort((a, b) => compareRows(a, b, lastSort));
+
+      // status
+      setStatus(`${computed.length} weapons • sort: ${lastSort.key} (${lastSort.dir})`);
+
+      // render
+      renderChart(computed, chartMetric, ttkKey);
+      renderTable(computed, ttkKey, stkKey);
+
+      // update chart title
+      const title = (chartMetric === "SCORE")
+        ? `Performance Landscape (Score 0–100)`
+        : `Performance Landscape (${zone} TTK vs Armor ${armor} — seconds)`;
+      document.getElementById("chartTitle").textContent = title;
+    }
+
+    function buildRanges(list) {
+      const keys = ["TTK","Sustain","Handling","RangeScore","Reload","ArmorCons"];
+      const r = {};
+      keys.forEach(k => {
+        const vals = list.map(x => x[k]).filter(v => typeof v === "number" && isFinite(v));
+        r[k] = vals.length ? { min: Math.min(...vals), max: Math.max(...vals) } : { min: 0, max: 1 };
+      });
+      return r;
+    }
+
+    function compareRows(a, b, sort) {
+      const dir = (sort.dir === "asc") ? 1 : -1;
+      const key = sort.key;
+
+      const av = getSortValue(a, key);
+      const bv = getSortValue(b, key);
+
+      if (key === "Name") return (String(av).localeCompare(String(bv))) * dir;
+
+      // nulls always sink to bottom
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+
+      return (av - bv) * dir;
+    }
+
+    function getSortValue(row, key) {
+      switch(key) {
+        case "Name": return row.Name || "";
+        case "Score": return row.Score01 ?? null;
+        case "TTK": return row.TTK ?? null;
+        case "DPS": return row.DPS ?? null;
+        case "Sustain": return row.Sustain ?? null;
+        case "Reload": return row.Reload ?? null;
+        case "Range": return row.Range ?? null;
+        case "ArmorCons":
+        case "Armor": return row.ArmorCons ?? null;
+        case "Vol": return row.Vol ?? null;
+        default: return row.Score01 ?? null;
+      }
+    }
+
+    function renderChart(list, metric, ttkKey) {
+      const ctx = document.getElementById('mainChart').getContext('2d');
+      const chartData = list.slice(0, 15);
+
+      if (chart) chart.destroy();
+
+      const labels = chartData.map(d => d.Name);
+
+      let data, label;
+      if (metric === "SCORE") {
+        label = "Composite Score (Higher is Better)";
+        data = chartData.map(d => d.Score);
+      } else {
+        label = "Time to Kill (Lower is Better)";
+        data = chartData.map(d => (d.TTK ?? null));
+      }
+
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label,
+            data,
+            backgroundColor: '#00d2ff',
+            borderColor: '#00d2ff',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true, grid: { color: '#1e293b' }, ticks: { color: '#fff' } },
+            x: { ticks: { color: '#fff', font: { size: 10 } } }
+          },
+          plugins: { legend: { labels: { color: '#fff' } } }
         }
+      });
+    }
 
-        function showDetails(name) {
-            const d = rawData.find(w => w.Name === name);
-            if(!d) return;
+    function renderTable(list, ttkKey, stkKey) {
+      const tbody = document.querySelector('#weaponTable tbody');
 
-            document.getElementById('dName').innerText = d.Name;
-            document.getElementById('dCat').innerText = `${d.Category} | Rarity: ${d.R || 'Common'}`;
-            
-            document.getElementById('dStats').innerHTML = `
-                <div style="margin-top:20px;">
-                    <p><b>Firing Mode:</b> ${d['Firing Mode'] || 'N/A'}</p>
-                    <p><b>Armor Pen:</b> ${d['Armor Pen'] || 'N/A'}</p>
-                    <p><b>Crit Multi:</b> ${d['Crit Multi'] || '1.0'}x</p>
-                    <hr>
-                    <p><b>Stability:</b> ${d.Stability || '0'}</p>
-                    <p><b>Agility:</b> ${d.Agility || '0'}</p>
-                    <p><b>Stealth:</b> ${d.Stealth || '0'}</p>
-                    <p><b>Weight:</b> ${d.Weight || '0'}</p>
-                    <hr>
-                    <h3 style="color:var(--neon-red);">Sell Value: $${d.Sell ? d.Sell.toLocaleString() : '0'}</h3>
-                    ${d.Notes ? `<p style="font-size: 0.8rem; font-style: italic; color: #94a3b8;">Note: ${d.Notes}</p>` : ''}
+      tbody.innerHTML = list.map(d => {
+        const ttkTxt = d.TTK ? d.TTK.toFixed(2) + "s" : "-";
+        const scoreTxt = (typeof d.Score === "number") ? d.Score.toFixed(1) : "-";
+        const dpsTxt = d.DPS ? d.DPS : "-";
+        const susTxt = (typeof d.Sustain === "number") ? d.Sustain.toFixed(1) : "-";
+        const relTxt = d.Reload ? d.Reload.toFixed(2) + "s" : "-";
+        const rngTxt = d.Range ? d.Range + "m" : "-";
+        const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
+        const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
+
+        // safer quoting
+        const safeName = (d.Name || "").replace(/'/g, "\\'");
+
+        return `
+          <tr onclick="showDetails('${safeName}')">
+            <td class="stat-val">${d.Name}</td>
+            <td class="highlight">${scoreTxt}</td>
+            <td>${ttkTxt}</td>
+            <td>${dpsTxt}</td>
+            <td>${susTxt}</td>
+            <td>${relTxt}</td>
+            <td>${rngTxt}</td>
+            <td>${armTxt}</td>
+            <td>${volTxt}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function showDetails(name) {
+      const armor = document.getElementById('armor').value;
+      const zone = document.getElementById('zone').value;
+
+      const ttkKey = `${zone} TTK ${armor}`;
+      const stkKey = `${zone} STK ${armor}`;
+
+      const d = rawData.find(w => w.Name === name);
+      if (!d) return;
+
+      // Recompute the same computed row for details, using current filters/weights normalization would differ,
+      // so we compute a "local" breakdown just for display (normalized against all weapons in dataset).
+      const category = d.Category || "Unknown";
+      const ttk = safeNum(d[ttkKey]);
+      const stk = safeNum(d[stkKey]);
+      const reload = safeNum(d.Reload);
+      const range = safeNum(d.Range);
+      const DPS = safeNum(d.DPS);
+
+      const handling = handlingIndex(d);
+      const armorCons = armorConsistency(d, zone);
+      const vol = ttkVolatility(d, zone);
+      const sustain = sustainedDpsApprox(d, ttkKey, stkKey);
+
+      // category max range
+      const maxRange = Math.max(...rawData.filter(x => (x.Category||"Unknown")===category).map(x => safeNum(x.Range) || 0));
+      const rangeScore = (range && maxRange) ? (range / maxRange) : null;
+
+      // Normalization for breakdown against whole dataset (stable view)
+      const whole = rawData.map(w => {
+        const c = w.Category || "Unknown";
+        const maxR = Math.max(...rawData.filter(x => (x.Category||"Unknown")===c).map(x => safeNum(x.Range) || 0));
+        return {
+          TTK: safeNum(w[ttkKey]),
+          Reload: safeNum(w.Reload),
+          Sustain: sustainedDpsApprox(w, ttkKey, stkKey),
+          Handling: handlingIndex(w),
+          ArmorCons: armorConsistency(w, zone),
+          RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null
+        };
+      });
+
+      const ranges = buildRanges(whole.map(x => ({
+        TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ArmorCons: x.ArmorCons
+      })));
+
+      const w = getWeights01();
+
+      const nTTK = invert01(normalize(ttk, ranges.TTK.min, ranges.TTK.max));
+      const nSustain = normalize(sustain, ranges.Sustain.min, ranges.Sustain.max);
+      const nHandling = normalize(handling, ranges.Handling.min, ranges.Handling.max);
+      const nRange = normalize(rangeScore, ranges.RangeScore.min, ranges.RangeScore.max);
+      const nReload = invert01(normalize(reload, ranges.Reload.min, ranges.Reload.max));
+      const nArmor = normalize(armorCons, ranges.ArmorCons.min, ranges.ArmorCons.max);
+
+      const score01 =
+        ((nTTK ?? 0) * w.ttk) +
+        ((nSustain ?? 0) * w.sustain) +
+        ((nHandling ?? 0) * w.handling) +
+        ((nRange ?? 0) * w.range) +
+        ((nReload ?? 0) * w.reload) +
+        ((nArmor ?? 0) * w.armor);
+
+      const score = Math.round(clamp(score01,0,1) * 1000) / 10;
+
+      document.getElementById('dName').innerText = d.Name;
+      document.getElementById('dCat').innerText = `${category} | Rarity: ${d.R || 'Common'}`;
+
+      const firingMode = d['Firing Mode'] || 'N/A';
+      const armorPen = d['Armor Pen'] || 'N/A';
+      const crit = d['Crit Multi'] || '1.0';
+
+      const sell = d.Sell ? `$${Number(d.Sell).toLocaleString()}` : '$0';
+
+      const bars = [
+        ["TTK", nTTK, w.ttk],
+        ["Sustain", nSustain, w.sustain],
+        ["Handling", nHandling, w.handling],
+        ["Range", nRange, w.range],
+        ["Reload", nReload, w.reload],
+        ["Armor", nArmor, w.armor],
+      ];
+
+      document.getElementById('dStats').innerHTML = `
+        <div style="margin-top:14px;">
+          <div class="grid2">
+            <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
+            <div class="kv"><b>${zone} TTK vs ${armor}</b><span>${ttk ? ttk.toFixed(2)+"s" : "-"}</span></div>
+            <div class="kv"><b>DPS</b><span>${DPS ?? "-"}</span></div>
+            <div class="kv"><b>Sustained DPS</b><span>${typeof sustain==="number" ? sustain.toFixed(1) : "-"}</span></div>
+            <div class="kv"><b>Reload</b><span>${reload ? reload.toFixed(2)+"s" : "-"}</span></div>
+            <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
+            <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
+            <div class="kv"><b>TTK Volatility</b><span>${typeof vol==="number" ? vol.toFixed(2) : "-"}</span></div>
+          </div>
+
+          <hr>
+
+          <div class="grid2">
+            <div class="kv"><b>Firing Mode</b><span>${firingMode}</span></div>
+            <div class="kv"><b>Armor Pen</b><span>${armorPen}</span></div>
+            <div class="kv"><b>Crit Multi</b><span>${crit}x</span></div>
+            <div class="kv"><b>Handling Index</b><span>${handling ? handling.toFixed(1) : "-"}</span></div>
+          </div>
+
+          <div class="bars">
+            ${bars.map(([label, n, weight]) => {
+              const pct = (typeof n === "number") ? Math.round(n*100) : 0;
+              const wPct = Math.round(weight*100);
+              return `
+                <div class="barRow">
+                  <div class="lbl">${label} <span class="subtle">(${wPct}%)</span></div>
+                  <div class="barTrack"><div class="barFill" style="width:${pct}%"></div></div>
+                  <div class="val">${typeof n==="number" ? pct+"%" : "-"}</div>
                 </div>
-            `;
-            
-            // Scroll sidebar to top on mobile
-            if (window.innerWidth < 1000) {
-                document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-    </script>
+              `;
+            }).join("")}
+          </div>
+
+          <hr>
+
+          <h3 style="color:var(--neon-red); margin-bottom:6px;">Sell Value: ${sell}</h3>
+          ${d.Notes ? `<p class="subtle" style="font-style: italic;">Note: ${escapeHtml(String(d.Notes))}</p>` : ''}
+
+          <div class="note">
+            Breakdown normalizes against the full dataset for stability. Table ranking normalizes against the current filtered set.
+          </div>
+        </div>
+      `;
+
+      // Scroll detail panel into view on mobile
+      if (window.innerWidth < 1100) {
+        document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+  </script>
 </body>
 </html>
