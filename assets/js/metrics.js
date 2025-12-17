@@ -1,4 +1,4 @@
-import { OVERALL_HIT_WEIGHTS } from './constants.js';
+import { DISTANCE_BANDS, OVERALL_HIT_WEIGHTS } from './constants.js';
 import { clamp, safeNum, stddev, normalize, invert01, weightedAverage, percentile } from './utils.js';
 
 export function reloadTax(reload, ttk) {
@@ -220,4 +220,55 @@ export function normalizeMetrics(values, ranges) {
     nExposure,
     nMobilityCost
   };
+}
+
+export function distanceBandScores(rangeMeters, rangeScore, categoryMaxRange, metaScore01) {
+  const result = { scores: {}, score01: {} };
+  DISTANCE_BANDS.forEach(({ key }) => {
+    result.scores[key] = null;
+    result.score01[key] = null;
+  });
+
+  const hasMetaScore = typeof metaScore01 === "number" && isFinite(metaScore01);
+  const hasRangeScore = typeof rangeScore === "number" && isFinite(rangeScore);
+  const hasRange = typeof rangeMeters === "number" && isFinite(rangeMeters);
+  const hasMax = typeof categoryMaxRange === "number" && isFinite(categoryMaxRange) && categoryMaxRange > 0;
+
+  if (!hasMetaScore || !hasRangeScore) return result;
+
+  const clampedRangeScore = clamp(rangeScore, 0, 1);
+  const denominator = hasMax ? categoryMaxRange : null;
+
+  const weightForBand = (band) => {
+    if (!denominator || !hasRange) {
+      if (band.key === "Long") return clampedRangeScore;
+      if (band.key === "CQC") return invert01(clampedRangeScore);
+      const target = (band.key === "Close") ? 0.35 : 0.7;
+      const falloff = 0.35;
+      return clamp(1 - (Math.abs(clampedRangeScore - target) / falloff), 0, 1);
+    }
+
+    const minNorm = clamp(band.min / denominator, 0, 1);
+    const maxNorm = isFinite(band.max) ? clamp(band.max / denominator, 0, 1) : 1;
+
+    if (clampedRangeScore < minNorm) {
+      return clamp(clampedRangeScore / (minNorm || 1), 0, 1);
+    }
+
+    if (clampedRangeScore > maxNorm) {
+      const denom = Math.max(1 - maxNorm, 0.0001);
+      return clamp(1 - ((clampedRangeScore - maxNorm) / denom), 0, 1);
+    }
+
+    return 1;
+  };
+
+  DISTANCE_BANDS.forEach((band) => {
+    const weight = weightForBand(band);
+    const score01 = clamp(metaScore01 * weight, 0, 1);
+    result.score01[band.key] = score01;
+    result.scores[band.key] = Math.round(score01 * 1000) / 10;
+  });
+
+  return result;
 }
