@@ -32,6 +32,7 @@ function getSortValue(row, key) {
     case "Score": return row.Score01 ?? null;
     case "TTK": return row.TTK ?? null;
     case "DPS": return row.DPS ?? null;
+    case "DamagePerCycle": return row.DamagePerCycle ?? null;
     case "Sustain": return row.Sustain ?? null;
     case "Engage": return row.EngagementCapacity ?? null;
     case "Reload": return row.Reload ?? null;

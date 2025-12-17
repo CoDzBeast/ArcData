@@ -126,6 +126,14 @@ export function armorBreakpoint(d) {
   return { deltaL, deltaM, deltaH, avgDelta };
 }
 
+export function damagePerCycle(d) {
+  const mag = safeNum(d.Mag);
+  const dmg = safeNum(d.DMG);
+
+  if (!mag || !dmg || mag <= 0 || dmg <= 0) return null;
+  return mag * dmg;
+}
+
 export function headshotDependency(d, armor) {
   const body = safeNum(d[`Body TTK ${armor}`]);
   const head = safeNum(d[`Head TTK ${armor}`]);

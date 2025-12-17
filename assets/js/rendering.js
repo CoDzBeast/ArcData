@@ -47,6 +47,9 @@ export function renderTable(list, onRowClick) {
     const ttkTxt = d.TTK ? d.TTK.toFixed(2) + "s" : "-";
     const scoreTxt = (typeof d.Score === "number") ? d.Score.toFixed(1) : "-";
     const dpsTxt = d.DPS ? d.DPS : "-";
+    const dpcRawTxt = (typeof d.DamagePerCycle === "number") ? Math.round(d.DamagePerCycle) : "-";
+    const dpcNormTxt = (typeof d.DamagePerCycleNorm === "number") ? Math.round(d.DamagePerCycleNorm * 100) / 100 : "-";
+    const dpcCell = `${dpcRawTxt}${dpcNormTxt !== "-" ? `<div class="subtle">${dpcNormTxt} norm</div>` : ""}`;
     const susTxt = (typeof d.Sustain === "number") ? d.Sustain.toFixed(1) : "-";
     const engageTxt = (typeof d.EngagementCapacity === "number") ? d.EngagementCapacity : "-";
     const engageWarn = d.ReloadEveryKill ? "⚠️" : "";
@@ -70,6 +73,7 @@ export function renderTable(list, onRowClick) {
         <td class="highlight">${scoreTxt}</td>
         <td>${ttkTxt}</td>
         <td>${dpsTxt}</td>
+        <td>${dpcCell}</td>
         <td>${susTxt}</td>
         <td>${engageCell}</td>
         <td>${relCell}</td>
