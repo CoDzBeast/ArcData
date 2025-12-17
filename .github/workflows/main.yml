@@ -1,7 +1,30 @@
+name: Deploy Website
+
 on:
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-  
-  # Also runs when you push to the main branch
   push:
     branches: ["main"]
+  workflow_dispatch:      # This line enables the manual "Run workflow" button
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/setup-pages@v4
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
