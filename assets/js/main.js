@@ -57,6 +57,12 @@ function updateUI() {
   const handlingRange = handlingValues.length
     ? { min: Math.min(...handlingValues), max: Math.max(...handlingValues) }
     : { min: 0, max: 1 };
+  const weightValues = rawData
+    .map(d => safeNum(d.Weight))
+    .filter(v => typeof v === "number" && isFinite(v));
+  const weightRange = weightValues.length
+    ? { min: Math.min(...weightValues), max: Math.max(...weightValues) }
+    : { min: 0, max: 1 };
   rawData.forEach(d => {
     const c = d.Category || "Unknown";
 
@@ -82,9 +88,17 @@ function updateUI() {
 
     const ttk = getZoneTTK(d, zone, armor);
     const stk = getZoneSTK(d, zone, armor);
+    const overallTTK = getZoneTTK(d, "Overall", armor);
     const reload = safeNum(d.Reload);
     const mag = safeNum(d.Mag);
     const reloadTaxVal = reloadTax(reload, ttk);
+    const weight = safeNum(d.Weight);
+    const weightFactor = (typeof weight === "number")
+      ? normalize(weight, weightRange.min, weightRange.max)
+      : null;
+    const exposureTime = (typeof overallTTK === "number" && typeof weightFactor === "number")
+      ? overallTTK * (1 + weightFactor)
+      : null;
 
     const engagementsPerMag = (typeof mag === "number" && mag > 0 && typeof stk === "number" && stk > 0)
       ? Math.floor(mag / stk)
@@ -124,6 +138,8 @@ function updateUI() {
       HandlingIndexNorm: handlingNorm,
       ArmorCons: armorCons,
       Vol: vol,
+      WeightFactor: weightFactor,
+      ExposureTime: exposureTime,
       DamagePerCycle: dmgPerCycle,
       DamagePerCycleNorm: dmgPerCycleNorm,
       HeadDep: headDep,
@@ -147,7 +163,8 @@ function updateUI() {
       reloadTax: d.ReloadTax,
       armorCons: d.ArmorCons,
       armorBreakAvg: d.ArmorBreakAvg,
-      volatility: d.Vol
+      volatility: d.Vol,
+      exposureTime: d.ExposureTime
     }, ranges);
 
     const { score, score01 } = computeScore(normalized);
@@ -157,6 +174,7 @@ function updateUI() {
       ...normalized,
       ConsistencyScore: normalized.nConsistency,
       ArmorBreakpointScore: normalized.nArmorBreak,
+      ExposureTimeNorm: normalized.nExposure,
       Score: score,
       Score01: score01
     };
@@ -189,12 +207,20 @@ function showDetails(name) {
 
   const ttk = getZoneTTK(d, zone, armor);
   const stk = getZoneSTK(d, zone, armor);
+  const overallTTK = getZoneTTK(d, "Overall", armor);
   const reload = safeNum(d.Reload);
   const mag = safeNum(d.Mag);
   const range = safeNum(d.Range);
   const DPS = safeNum(d.DPS);
   const dmgPerCycle = damagePerCycle(d);
   const reloadTaxVal = reloadTax(reload, ttk);
+  const weight = safeNum(d.Weight);
+  const weightFactor = (typeof weight === "number")
+    ? normalize(weight, weightRange.min, weightRange.max)
+    : null;
+  const exposureTime = (typeof overallTTK === "number" && typeof weightFactor === "number")
+    ? overallTTK * (1 + weightFactor)
+    : null;
 
   const engagementsPerMag = (typeof mag === "number" && mag > 0 && typeof stk === "number" && stk > 0)
     ? Math.floor(mag / stk)
@@ -242,6 +268,14 @@ function showDetails(name) {
     const wSTK = (zone === "Overall") ? getZoneSTK(w, "Overall", armor) : safeNum(w[stkKey]);
     const wReload = safeNum(w.Reload);
     const wReloadTax = reloadTax(wReload, wTTK);
+    const wWeight = safeNum(w.Weight);
+    const wWeightFactor = (typeof wWeight === "number")
+      ? normalize(wWeight, weightRange.min, weightRange.max)
+      : null;
+    const wOverallTTK = getZoneTTK(w, "Overall", armor);
+    const wExposureTime = (typeof wOverallTTK === "number" && typeof wWeightFactor === "number")
+      ? wOverallTTK * (1 + wWeightFactor)
+      : null;
 
     const wSustain = (zone === "Overall")
       ? sustainedDpsApprox(w, null, null, wTTK, wSTK)
@@ -256,12 +290,13 @@ function showDetails(name) {
       ArmorCons: armorConsistency(w, zone),
       ArmorBreakAvg: armorBreakpoint(w).avgDelta,
       RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null,
-      Vol: ttkVolatility(w, zone)
+      Vol: ttkVolatility(w, zone),
+      ExposureTime: wExposureTime
     };
   });
 
   const ranges = buildRanges(whole.map(x => ({
-    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ReloadTax: x.ReloadTax, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg, Vol: x.Vol
+    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ReloadTax: x.ReloadTax, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg, Vol: x.Vol, ExposureTime: x.ExposureTime
   })));
 
   const normalized = normalizeMetrics({
@@ -273,7 +308,8 @@ function showDetails(name) {
     reloadTax: reloadTaxVal,
     armorCons,
     armorBreakAvg: armorBreak.avgDelta,
-    volatility: vol
+    volatility: vol,
+    exposureTime
   }, ranges);
 
   const { score } = computeScore(normalized);
@@ -289,6 +325,9 @@ function showDetails(name) {
     ["ΔH", armorBreak.deltaH],
     ["Avg", armorBreak.avgDelta]
   ].map(([label,val]) => `<div class="kv"><b>${label}</b><span>${typeof val === "number" ? val.toFixed(2) : '-'}</span></div>`).join("");
+  const exposureTxt = exposureTime ? exposureTime.toFixed(2) + "s" : "-";
+  const exposureNormTxt = (typeof normalized.nExposure === "number") ? Math.round(normalized.nExposure * 100) / 100 : "-";
+  const weightFactorTxt = (typeof weightFactor === "number") ? Math.round(weightFactor * 100) / 100 : "-";
 
   const bars = [
     ["TTK", normalized.nTTK],
@@ -299,6 +338,7 @@ function showDetails(name) {
     ["Reload Penalty", normalized.nReloadPenalty],
     ["Armor", normalized.nArmor],
     ["Armor BP", normalized.nArmorBreak],
+    ["Exposure (Inv)", normalized.nExposure],
   ];
 
   const statsHtml = `
@@ -306,6 +346,8 @@ function showDetails(name) {
       <div class="grid2">
         <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>${zone} TTK vs ${armor}</b><span>${ttk ? ttk.toFixed(2)+"s" : "-"}</span></div>
+        <div class="kv"><b>Exposure Time</b><span>${exposureTxt}</span></div>
+        <div class="kv"><b>Exposure (Norm)</b><span>${exposureNormTxt}</span></div>
         <div class="kv"><b>DPS</b><span>${DPS ?? "-"}</span></div>
         <div class="kv"><b>Sustained DPS</b><span>${typeof sustain==="number" ? sustain.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Damage / Cycle</b><span>${typeof dmgPerCycle==="number" ? Math.round(dmgPerCycle) : "-"}</span></div>
@@ -315,6 +357,7 @@ function showDetails(name) {
         <div class="kv"><b>Reload Each Kill?</b><span>${reloadEveryKill === null ? "-" : (reloadEveryKill ? "Yes" : "No")}</span></div>
         <div class="kv"><b>Reload Tax</b><span>${typeof reloadTaxVal==="number" ? (reloadTaxVal*100).toFixed(1)+"%" : "-"}</span></div>
         <div class="kv"><b>Reload Penalty (Norm)</b><span>${typeof normalized.nReloadPenalty==="number" ? Math.round(normalized.nReloadPenalty*100)/100 : "-"}</span></div>
+        <div class="kv"><b>Weight Factor</b><span>${weightFactorTxt}</span></div>
         <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
         <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
         <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>

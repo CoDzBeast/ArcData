@@ -45,6 +45,8 @@ export function renderTable(list, onRowClick) {
 
   tbody.innerHTML = list.map(d => {
     const ttkTxt = d.TTK ? d.TTK.toFixed(2) + "s" : "-";
+    const exposureTxt = (typeof d.ExposureTime === "number") ? d.ExposureTime.toFixed(2) + "s" : "-";
+    const exposureNormTxt = (typeof d.ExposureTimeNorm === "number") ? Math.round(d.ExposureTimeNorm * 100) / 100 : "-";
     const scoreTxt = (typeof d.Score === "number") ? d.Score.toFixed(1) : "-";
     const dpsTxt = d.DPS ? d.DPS : "-";
     const dpcRawTxt = (typeof d.DamagePerCycle === "number") ? Math.round(d.DamagePerCycle) : "-";
@@ -75,6 +77,7 @@ export function renderTable(list, onRowClick) {
         <td class="stat-val">${d.Name}</td>
         <td class="highlight">${scoreTxt}</td>
         <td>${ttkTxt}</td>
+        <td>${exposureTxt}${exposureNormTxt !== "-" ? `<div class="subtle">${exposureNormTxt} norm</div>` : ""}</td>
         <td>${dpsTxt}</td>
         <td>${dpcCell}</td>
         <td>${susTxt}</td>

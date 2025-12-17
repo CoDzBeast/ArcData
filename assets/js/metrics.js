@@ -157,7 +157,7 @@ export function headshotDependencyStats(list, armor) {
 }
 
 export function buildRanges(list) {
-  const keys = ["TTK","Sustain","Handling","RangeScore","Reload","ReloadTax","ArmorCons","ArmorBreakAvg","Vol"];
+  const keys = ["TTK","Sustain","Handling","RangeScore","Reload","ReloadTax","ArmorCons","ArmorBreakAvg","Vol","ExposureTime"];
   const r = {};
   keys.forEach(k => {
     const vals = list.map(x => x[k]).filter(v => typeof v === "number" && isFinite(v));
@@ -168,6 +168,7 @@ export function buildRanges(list) {
 
 export function normalizeMetrics(values, ranges) {
   const nReloadPenalty = invert01(normalize(values.reloadTax, ranges.ReloadTax.min, ranges.ReloadTax.max));
+  const nExposure = invert01(normalize(values.exposureTime, ranges.ExposureTime.min, ranges.ExposureTime.max));
 
   return {
     nTTK: invert01(normalize(values.ttk, ranges.TTK.min, ranges.TTK.max)),
@@ -178,6 +179,7 @@ export function normalizeMetrics(values, ranges) {
     nReloadPenalty,
     nArmor: normalize(values.armorCons, ranges.ArmorCons.min, ranges.ArmorCons.max),
     nArmorBreak: invert01(normalize(values.armorBreakAvg, ranges.ArmorBreakAvg.min, ranges.ArmorBreakAvg.max)),
-    nConsistency: invert01(normalize(values.volatility, ranges.Vol.min, ranges.Vol.max))
+    nConsistency: invert01(normalize(values.volatility, ranges.Vol.min, ranges.Vol.max)),
+    nExposure
   };
 }
