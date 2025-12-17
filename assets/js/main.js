@@ -182,15 +182,20 @@ function showDetails(name) {
   const armorBreak = armorBreakpoint(d);
 
   const dominance = roleDominanceByName[d.Name] || {};
-  const dominanceTxt = typeof dominance.index === 'number' ? `${dominance.index.toFixed(1)}%` : '-';
+  const dominanceVal = safeNum(dominance.index);
+  const dominanceTxt = dominanceVal !== null ? `${dominanceVal.toFixed(1)}%` : '-';
   const dominanceBadge = dominance.top ? '🏆 Top 10%' : '';
   const outlierInfo = outlierByName[d.Name] || {};
-  const outlierTxt = typeof outlierInfo.index === 'number' ? `${outlierInfo.index.toFixed(2)}σ` : '-';
+  const outlierIdx = safeNum(outlierInfo.index);
+  const outlierTxt = outlierIdx !== null ? `${outlierIdx.toFixed(2)}σ` : '-';
   const outlierBadge = outlierInfo.warning ? '⚠️ Above Cat Avg' : '';
-  const outlierAvgTxt = typeof outlierInfo.categoryAverage === 'number' ? outlierInfo.categoryAverage.toFixed(1) : '-';
+  const outlierAvg = safeNum(outlierInfo.categoryAverage);
+  const outlierAvgTxt = outlierAvg !== null ? outlierAvg.toFixed(1) : '-';
   const counterInfo = counterByName[d.Name] || {};
-  const counterScoreTxt = typeof counterInfo.score === 'number' ? counterInfo.score.toFixed(1) : '-';
-  const counterRankTxt = typeof counterInfo.rank === 'number' ? `${counterInfo.rank.toFixed(1)}%` : '-';
+  const counterScore = safeNum(counterInfo.score);
+  const counterRank = safeNum(counterInfo.rank);
+  const counterScoreTxt = counterScore !== null ? counterScore.toFixed(1) : '-';
+  const counterRankTxt = counterRank !== null ? `${counterRank.toFixed(1)}%` : '-';
   const counterBadge = counterInfo.top ? '🛡️ Meta Counter' : '';
 
   const armorPen = armorPenEffectiveness(d, getControlState().zone, computeContext([d], getControlState()).hitWeights);
@@ -200,23 +205,26 @@ function showDetails(name) {
     ['ΔM', armorBreak.deltaM],
     ['ΔH', armorBreak.deltaH],
     ['Avg', armorBreak.avgDelta],
-  ].map(([label, val]) => `<div class="kv"><b>${label}</b><span>${typeof val === 'number' ? val.toFixed(2) : '-'}</span></div>`).join('');
+  ].map(([label, val]) => {
+    const v = safeNum(val);
+    return `<div class="kv"><b>${label}</b><span>${v !== null ? v.toFixed(2) : '-'}</span></div>`;
+  }).join('');
 
   const statsHtml = `
     <div class="grid2">
-      <div class="kv"><b>Score</b><span>${d.Score?.toFixed ? d.Score.toFixed(1) : '-'}</span></div>
-      <div class="kv"><b>Range</b><span>${d.Range ? `${d.Range}m` : '-'}</span></div>
-      <div class="kv"><b>TTK (${getControlState().zone}/${getControlState().armor})</b><span>${d.TTK ? `${d.TTK.toFixed(2)}s` : '-'}</span></div>
-      <div class="kv"><b>Sustain</b><span>${d.Sustain ? `${d.Sustain.toFixed(1)} DPS` : '-'}</span></div>
-      <div class="kv"><b>Reload</b><span>${d.Reload ? `${d.Reload.toFixed(2)}s` : '-'}</span></div>
+      <div class="kv"><b>Score</b><span>${safeNum(d.Score) !== null ? safeNum(d.Score).toFixed(1) : '-'}</span></div>
+      <div class="kv"><b>Range</b><span>${safeNum(d.Range) !== null ? `${safeNum(d.Range)}m` : '-'}</span></div>
+      <div class="kv"><b>TTK (${getControlState().zone}/${getControlState().armor})</b><span>${safeNum(d.TTK) !== null ? `${safeNum(d.TTK).toFixed(2)}s` : '-'}</span></div>
+      <div class="kv"><b>Sustain</b><span>${safeNum(d.Sustain) !== null ? `${safeNum(d.Sustain).toFixed(1)} DPS` : '-'}</span></div>
+      <div class="kv"><b>Reload</b><span>${safeNum(d.Reload) !== null ? `${safeNum(d.Reload).toFixed(2)}s` : '-'}</span></div>
       <div class="kv"><b>Kills/Mag</b><span>${d.EngagementCapacity ?? '-'}</span></div>
-      <div class="kv"><b>Exposure</b><span>${d.ExposureTime ? `${d.ExposureTime.toFixed(2)}s` : '-'}</span></div>
-      <div class="kv"><b>Mobility</b><span>${d.MobilityCost ? `${d.MobilityCost.toFixed(2)}s` : '-'}</span></div>
-      <div class="kv"><b>Handling</b><span>${d.Handling ? d.Handling.toFixed(1) : '-'}</span></div>
-      <div class="kv"><b>Crit Leverage</b><span>${d.CritLeverage ? `${d.CritLeverage.toFixed(2)}s` : '-'}</span></div>
-      <div class="kv"><b>Head Dep</b><span>${d.HeadDep ? d.HeadDep.toFixed(2) : '-'}</span></div>
-      <div class="kv"><b>Armor Cons</b><span>${d.ArmorCons ? `${Math.round(d.ArmorCons * 100)}%` : '-'}</span></div>
-      <div class="kv"><b>Armor Pen</b><span>${typeof armorPen.deltaRatio === 'number' ? `${(armorPen.deltaRatio * 100).toFixed(1)}%` : '-'}</span></div>
+      <div class="kv"><b>Exposure</b><span>${safeNum(d.ExposureTime) !== null ? `${safeNum(d.ExposureTime).toFixed(2)}s` : '-'}</span></div>
+      <div class="kv"><b>Mobility</b><span>${safeNum(d.MobilityCost) !== null ? `${safeNum(d.MobilityCost).toFixed(2)}s` : '-'}</span></div>
+      <div class="kv"><b>Handling</b><span>${safeNum(d.Handling) !== null ? safeNum(d.Handling).toFixed(1) : '-'}</span></div>
+      <div class="kv"><b>Crit Leverage</b><span>${safeNum(d.CritLeverage) !== null ? `${safeNum(d.CritLeverage).toFixed(2)}s` : '-'}</span></div>
+      <div class="kv"><b>Head Dep</b><span>${safeNum(d.HeadDep) !== null ? safeNum(d.HeadDep).toFixed(2) : '-'}</span></div>
+      <div class="kv"><b>Armor Cons</b><span>${safeNum(d.ArmorCons) !== null ? `${Math.round(safeNum(d.ArmorCons) * 100)}%` : '-'}</span></div>
+      <div class="kv"><b>Armor Pen</b><span>${safeNum(armorPen.deltaRatio) !== null ? `${(safeNum(armorPen.deltaRatio) * 100).toFixed(1)}%` : '-'}</span></div>
     </div>
     <hr />
     <div class="grid2">

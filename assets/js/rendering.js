@@ -1,4 +1,4 @@
-import { escapeHtml } from './utils.js';
+import { escapeHtml, safeNum } from './utils.js';
 
 export function renderChart(list, metric, existingChart) {
   const ctx = document.getElementById('mainChart').getContext('2d');
@@ -44,20 +44,28 @@ export function renderTable(list, onRowClick) {
   const tbody = document.querySelector('#weaponTable tbody');
 
   tbody.innerHTML = list.map(d => {
-    const ttkTxt = d.TTK ? d.TTK.toFixed(2) + "s" : "-";
-    const exposureTxt = (typeof d.ExposureTime === "number") ? d.ExposureTime.toFixed(2) + "s" : "-";
+    const ttkVal = safeNum(d.TTK);
+    const ttkTxt = ttkVal !== null ? `${ttkVal.toFixed(2)}s` : "-";
+    const exposureVal = safeNum(d.ExposureTime);
+    const exposureTxt = exposureVal !== null ? `${exposureVal.toFixed(2)}s` : "-";
     const exposureNormTxt = (typeof d.ExposureTimeNorm === "number") ? Math.round(d.ExposureTimeNorm * 100) / 100 : "-";
-    const mobilityCostTxt = (typeof d.MobilityCost === "number") ? d.MobilityCost.toFixed(2) + "s" : "-";
+    const mobilityCostVal = safeNum(d.MobilityCost);
+    const mobilityCostTxt = mobilityCostVal !== null ? `${mobilityCostVal.toFixed(2)}s` : "-";
     const mobilityCostNormTxt = (typeof d.MobilityCostNorm === "number") ? Math.round(d.MobilityCostNorm * 100) / 100 : "-";
-    const scoreTxt = (typeof d.Score === "number") ? d.Score.toFixed(1) : "-";
-    const counterTxt = (typeof d.CounterScore === "number") ? d.CounterScore.toFixed(1) : "-";
-    const counterRankTxt = (typeof d.CounterRank === "number") ? `${d.CounterRank.toFixed(1)}%` : "-";
+    const scoreVal = safeNum(d.Score);
+    const scoreTxt = scoreVal !== null ? scoreVal.toFixed(1) : "-";
+    const counterVal = safeNum(d.CounterScore);
+    const counterTxt = counterVal !== null ? counterVal.toFixed(1) : "-";
+    const counterRankVal = safeNum(d.CounterRank);
+    const counterRankTxt = counterRankVal !== null ? `${counterRankVal.toFixed(1)}%` : "-";
     const counterBadge = d.CounterTop10 ? `<div class="subtle">🛡️ Meta counter</div>` : "";
     const counterCell = (counterTxt === "-") ? "-" : `${counterTxt}${counterRankTxt !== "-" ? `<div class="subtle">${counterRankTxt} rank</div>` : ""}${counterBadge}`;
-    const outlierTxt = (typeof d.OutlierIndex === "number") ? `${d.OutlierIndex.toFixed(2)}σ` : "-";
+    const outlierVal = safeNum(d.OutlierIndex);
+    const outlierTxt = outlierVal !== null ? `${outlierVal.toFixed(2)}σ` : "-";
     const outlierBadge = d.OutlierWarning ? `<div class="warn-pill">⚠️ Spike</div>` : "";
     const outlierCell = (outlierTxt === "-") ? "-" : `${outlierTxt}${outlierBadge ? `<div class="subtle">${outlierBadge}</div>` : ""}`;
-    const dominanceTxt = (typeof d.RoleDominanceIndex === "number") ? `${d.RoleDominanceIndex.toFixed(1)}%` : "-";
+    const dominanceVal = safeNum(d.RoleDominanceIndex);
+    const dominanceTxt = dominanceVal !== null ? `${dominanceVal.toFixed(1)}%` : "-";
     const dominanceCell = d.RoleDominanceTop10
       ? `${dominanceTxt}<div class="subtle">Top 10% role</div>`
       : dominanceTxt;
@@ -65,37 +73,47 @@ export function renderTable(list, onRowClick) {
     const dpcRawTxt = (typeof d.DamagePerCycle === "number") ? Math.round(d.DamagePerCycle) : "-";
     const dpcNormTxt = (typeof d.DamagePerCycleNorm === "number") ? Math.round(d.DamagePerCycleNorm * 100) / 100 : "-";
     const dpcCell = `${dpcRawTxt}${dpcNormTxt !== "-" ? `<div class="subtle">${dpcNormTxt} norm</div>` : ""}`;
-    const susTxt = (typeof d.Sustain === "number") ? d.Sustain.toFixed(1) : "-";
+    const susVal = safeNum(d.Sustain);
+    const susTxt = susVal !== null ? susVal.toFixed(1) : "-";
     const engageTxt = (typeof d.EngagementCapacity === "number") ? d.EngagementCapacity : "-";
     const engageWarn = d.ReloadEveryKill ? "⚠️" : "";
     const engageCell = `${engageTxt}${engageWarn ? `<div class="subtle">Reload each kill</div>` : ""}`;
-    const relTxt = d.Reload ? d.Reload.toFixed(2) + "s" : "-";
+    const relVal = safeNum(d.Reload);
+    const relTxt = relVal !== null ? `${relVal.toFixed(2)}s` : "-";
     const relTaxTxt = (typeof d.ReloadTax === "number") ? (d.ReloadTax * 100).toFixed(1) + "%" : "-";
     const relPenaltyTxt = (typeof d.nReloadPenalty === "number") ? Math.round(d.nReloadPenalty * 100) / 100 : "-";
     const relCell = `${relTxt}${relTaxTxt !== "-" ? `<div class="subtle">${relTaxTxt} tax / ${relPenaltyTxt} norm</div>` : ""}`;
     const handlingTxt = (typeof d.HandlingIndex === "number") ? Math.round(d.HandlingIndex * 10) / 10 : "-";
     const handlingNormTxt = (typeof d.HandlingIndexNorm === "number") ? Math.round(d.HandlingIndexNorm * 100) / 100 : "-";
     const handlingCell = `${handlingTxt}${handlingNormTxt !== "-" ? `<div class="subtle">${handlingNormTxt} norm</div>` : ""}`;
-    const rngTxt = d.Range ? d.Range + "m" : "-";
-    const headDepTxt = (typeof d.HeadDep === "number") ? d.HeadDep.toFixed(2) : "-";
+    const rngVal = safeNum(d.Range);
+    const rngTxt = rngVal !== null ? `${rngVal}m` : "-";
+    const headDepVal = safeNum(d.HeadDep);
+    const headDepTxt = headDepVal !== null ? headDepVal.toFixed(2) : "-";
     const headDepNormTxt = (typeof d.HeadDepNorm === "number") ? Math.round(d.HeadDepNorm * 100) / 100 : "-";
     const headDepBadge = d.HeadDepHigh ? " 🔺" : "";
-    const critLevTxt = (typeof d.CritLeverage === "number") ? d.CritLeverage.toFixed(2) + "s" : "-";
+    const critLevVal = safeNum(d.CritLeverage);
+    const critLevTxt = critLevVal !== null ? `${critLevVal.toFixed(2)}s` : "-";
     const critLevNormTxt = (typeof d.CritLeverageNorm === "number") ? Math.round(d.CritLeverageNorm * 100) / 100 : "-";
     const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
-    const armorPenDeltaTxt = (typeof d.ArmorPenDelta === "number") ? `${(d.ArmorPenDelta * 100).toFixed(1)}%` : "-";
-    const armorPenSecondsTxt = (typeof d.ArmorPenDeltaSeconds === "number") ? `${d.ArmorPenDeltaSeconds.toFixed(2)}s` : "-";
+    const armorPenDeltaVal = safeNum(d.ArmorPenDelta);
+    const armorPenDeltaTxt = armorPenDeltaVal !== null ? `${(armorPenDeltaVal * 100).toFixed(1)}%` : "-";
+    const armorPenSecondsVal = safeNum(d.ArmorPenDeltaSeconds);
+    const armorPenSecondsTxt = armorPenSecondsVal !== null ? `${armorPenSecondsVal.toFixed(2)}s` : "-";
     const armorPenNormTxt = (typeof d.ArmorPenScore === "number") ? Math.round(d.ArmorPenScore * 100) / 100 : "-";
     const armorPenCell = (armorPenDeltaTxt === "-")
       ? "-"
       : `${armorPenSecondsTxt}<div class="subtle">${armorPenDeltaTxt} / ${armorPenNormTxt} norm</div>`;
-    const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
+    const volVal = safeNum(d.Vol);
+    const volTxt = volVal !== null ? volVal.toFixed(2) : "-";
     const consTxt = (typeof d.ConsistencyScore === "number") ? Math.round(d.ConsistencyScore * 100) / 100 : "-";
-    const skillFloorTxt = (typeof d.SkillFloorScore === "number") ? d.SkillFloorScore.toFixed(1) : "-";
+    const skillFloorVal = safeNum(d.SkillFloorScore);
+    const skillFloorTxt = skillFloorVal !== null ? skillFloorVal.toFixed(1) : "-";
     const skillFloorCell = (skillFloorTxt === "-")
       ? "-"
       : `${skillFloorTxt}<div class="subtle">${typeof d.KillsPerMagNorm === "number" ? `K/Mag ${Math.round(d.KillsPerMagNorm * 100) / 100}` : "Head/Cons/K/Mag"}</div>`;
-    const skillCeilingTxt = (typeof d.SkillCeilingScore === "number") ? d.SkillCeilingScore.toFixed(1) : "-";
+    const skillCeilingVal = safeNum(d.SkillCeilingScore);
+    const skillCeilingTxt = skillCeilingVal !== null ? skillCeilingVal.toFixed(1) : "-";
     const skillCeilingCell = (skillCeilingTxt === "-")
       ? "-"
       : `${skillCeilingTxt}<div class="subtle">Crit/Handling/Head</div>`;

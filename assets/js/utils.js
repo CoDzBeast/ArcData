@@ -1,5 +1,10 @@
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-export const safeNum = (x) => (x === null || x === undefined || Number.isNaN(x)) ? null : Number(x);
+
+// Canonical numeric sanitizer to keep downstream formatting safe
+export function safeNum(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
 
 export function stddev(nums) {
   const arr = nums.filter(n => typeof n === "number" && isFinite(n));
