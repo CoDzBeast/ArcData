@@ -2,7 +2,7 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, buildRanges, normalizeMetrics } from './metrics.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics } from './metrics.js';
 import { safeNum, escapeHtml } from './utils.js';
 
 let rawData = [], chart;
@@ -71,6 +71,7 @@ function updateUI() {
     const handling = handlingIndex(d);
     const armorCons = armorConsistency(d, zone);
     const vol = ttkVolatility(d, zone);
+    const armorBreak = armorBreakpoint(d);
 
     return {
       ...d,
@@ -82,7 +83,9 @@ function updateUI() {
       Sustain: sustain,
       Handling: handling,
       ArmorCons: armorCons,
-      Vol: vol
+      Vol: vol,
+      ArmorBreakAvg: armorBreak.avgDelta,
+      ArmorBreakDeltas: armorBreak
     };
   });
 
@@ -95,12 +98,13 @@ function updateUI() {
       handling: d.Handling,
       rangeScore: d.RangeScore,
       reload: d.Reload,
-      armorCons: d.ArmorCons
+      armorCons: d.ArmorCons,
+      armorBreakAvg: d.ArmorBreakAvg
     }, ranges);
 
     const { score, score01 } = computeScore(normalized);
 
-    return { ...d, ...normalized, Score: score, Score01: score01 };
+    return { ...d, ...normalized, ArmorBreakpointScore: normalized.nArmorBreak, Score: score, Score01: score01 };
   });
 
   scored.sort((a, b) => compareRows(a, b, lastSort));
@@ -128,6 +132,7 @@ function showDetails(name) {
 
   const handling = handlingIndex(d);
   const armorCons = armorConsistency(d, zone);
+  const armorBreak = armorBreakpoint(d);
   const vol = ttkVolatility(d, zone);
 
   const ttkKey = `${zone} TTK ${armor}`;
@@ -159,12 +164,13 @@ function showDetails(name) {
       Sustain: wSustain,
       Handling: handlingIndex(w),
       ArmorCons: armorConsistency(w, zone),
+      ArmorBreakAvg: armorBreakpoint(w).avgDelta,
       RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null
     };
   });
 
   const ranges = buildRanges(whole.map(x => ({
-    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ArmorCons: x.ArmorCons
+    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg
   })));
 
   const normalized = normalizeMetrics({
@@ -173,7 +179,8 @@ function showDetails(name) {
     handling,
     rangeScore,
     reload,
-    armorCons
+    armorCons,
+    armorBreakAvg: armorBreak.avgDelta
   }, ranges);
 
   const { score } = computeScore(normalized);
@@ -183,6 +190,13 @@ function showDetails(name) {
   const crit = d['Crit Multi'] || '1.0';
   const sell = d.Sell ? `$${Number(d.Sell).toLocaleString()}` : '$0';
 
+  const armorBreakRows = [
+    ["ΔL", armorBreak.deltaL],
+    ["ΔM", armorBreak.deltaM],
+    ["ΔH", armorBreak.deltaH],
+    ["Avg", armorBreak.avgDelta]
+  ].map(([label,val]) => `<div class="kv"><b>${label}</b><span>${typeof val === "number" ? val.toFixed(2) : '-'}</span></div>`).join("");
+
   const bars = [
     ["TTK", normalized.nTTK],
     ["Sustain", normalized.nSustain],
@@ -190,6 +204,7 @@ function showDetails(name) {
     ["Range", normalized.nRange],
     ["Reload", normalized.nReload],
     ["Armor", normalized.nArmor],
+    ["Armor BP", normalized.nArmorBreak],
   ];
 
   const statsHtml = `
@@ -202,7 +217,12 @@ function showDetails(name) {
         <div class="kv"><b>Reload</b><span>${reload ? reload.toFixed(2)+"s" : "-"}</span></div>
         <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
         <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
+        <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>
         <div class="kv"><b>TTK Volatility</b><span>${typeof vol==="number" ? vol.toFixed(2) : "-"}</span></div>
+      </div>
+
+      <div class="grid2" style="margin-top:10px;">
+        ${armorBreakRows}
       </div>
 
       <hr>

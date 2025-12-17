@@ -99,8 +99,29 @@ export function ttkVolatility(d, zone) {
   return stddev(arr);
 }
 
+export function armorBreakpoint(d) {
+  const ttk0 = safeNum(d["Body TTK 0"]);
+  const ttkL = safeNum(d["Body TTK L"]);
+  const ttkM = safeNum(d["Body TTK M"]);
+  const ttkH = safeNum(d["Body TTK H"]);
+
+  if (!ttk0 || !ttkL || !ttkM || !ttkH) {
+    return { deltaL: null, deltaM: null, deltaH: null, avgDelta: null };
+  }
+
+  const ratio = (v) => (v && ttk0 > 0) ? (v / ttk0) : null;
+  const deltaL = ratio(ttkL);
+  const deltaM = ratio(ttkM);
+  const deltaH = ratio(ttkH);
+
+  const deltas = [deltaL, deltaM, deltaH].filter(v => typeof v === "number" && isFinite(v));
+  const avgDelta = deltas.length ? (deltas.reduce((a,b)=>a+b,0) / deltas.length) : null;
+
+  return { deltaL, deltaM, deltaH, avgDelta };
+}
+
 export function buildRanges(list) {
-  const keys = ["TTK","Sustain","Handling","RangeScore","Reload","ArmorCons"];
+  const keys = ["TTK","Sustain","Handling","RangeScore","Reload","ArmorCons","ArmorBreakAvg"];
   const r = {};
   keys.forEach(k => {
     const vals = list.map(x => x[k]).filter(v => typeof v === "number" && isFinite(v));
@@ -116,6 +137,7 @@ export function normalizeMetrics(values, ranges) {
     nHandling: normalize(values.handling, ranges.Handling.min, ranges.Handling.max),
     nRange: normalize(values.rangeScore, ranges.RangeScore.min, ranges.RangeScore.max),
     nReload: invert01(normalize(values.reload, ranges.Reload.min, ranges.Reload.max)),
-    nArmor: normalize(values.armorCons, ranges.ArmorCons.min, ranges.ArmorCons.max)
+    nArmor: normalize(values.armorCons, ranges.ArmorCons.min, ranges.ArmorCons.max),
+    nArmorBreak: invert01(normalize(values.armorBreakAvg, ranges.ArmorBreakAvg.min, ranges.ArmorBreakAvg.max))
   };
 }
