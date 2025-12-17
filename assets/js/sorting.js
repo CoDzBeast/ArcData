@@ -45,6 +45,7 @@ function getSortValue(row, key) {
     case "Consistency": return row.ConsistencyScore ?? null;
     case "Vol": return row.Vol ?? null;
     case "Exposure": return row.ExposureTime ?? null;
+    case "Mobility": return row.MobilityCostNorm ?? row.MobilityCost ?? null;
     default: return row.Score01 ?? null;
   }
 }
