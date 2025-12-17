@@ -30,6 +30,23 @@ export function weightedAverage(parts) {
   return wSum > 0 ? (vSum / wSum) : null;
 }
 
+export function percentile(nums, pct) {
+  const arr = nums
+    .filter(n => typeof n === "number" && isFinite(n))
+    .sort((a, b) => a - b);
+
+  if (!arr.length || pct === null || pct === undefined) return null;
+
+  const rank = (pct / 100) * (arr.length - 1);
+  const lower = Math.floor(rank);
+  const upper = Math.ceil(rank);
+
+  if (lower === upper) return arr[lower];
+
+  const weight = rank - lower;
+  return arr[lower] + (arr[upper] - arr[lower]) * weight;
+}
+
 export function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }

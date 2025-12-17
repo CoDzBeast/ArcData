@@ -1,5 +1,5 @@
 import { OVERALL_HIT_WEIGHTS } from './constants.js';
-import { clamp, safeNum, stddev, normalize, invert01, weightedAverage } from './utils.js';
+import { clamp, safeNum, stddev, normalize, invert01, weightedAverage, percentile } from './utils.js';
 
 export function getZoneTTK(d, zone, armor) {
   if (zone !== "Overall") return safeNum(d[`${zone} TTK ${armor}`]);
@@ -118,6 +118,28 @@ export function armorBreakpoint(d) {
   const avgDelta = deltas.length ? (deltas.reduce((a,b)=>a+b,0) / deltas.length) : null;
 
   return { deltaL, deltaM, deltaH, avgDelta };
+}
+
+export function headshotDependency(d, armor) {
+  const body = safeNum(d[`Body TTK ${armor}`]);
+  const head = safeNum(d[`Head TTK ${armor}`]);
+
+  if (!body || !head || head <= 0) return null;
+  return body / head;
+}
+
+export function headshotDependencyStats(list, armor) {
+  const values = list
+    .map(d => headshotDependency(d, armor))
+    .filter(v => typeof v === "number" && isFinite(v));
+
+  if (!values.length) return { min: null, max: null, p75: null };
+
+  return {
+    min: Math.min(...values),
+    max: Math.max(...values),
+    p75: percentile(values, 75)
+  };
 }
 
 export function buildRanges(list) {

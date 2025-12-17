@@ -50,6 +50,9 @@ export function renderTable(list, onRowClick) {
     const susTxt = (typeof d.Sustain === "number") ? d.Sustain.toFixed(1) : "-";
     const relTxt = d.Reload ? d.Reload.toFixed(2) + "s" : "-";
     const rngTxt = d.Range ? d.Range + "m" : "-";
+    const headDepTxt = (typeof d.HeadDep === "number") ? d.HeadDep.toFixed(2) : "-";
+    const headDepNormTxt = (typeof d.HeadDepNorm === "number") ? Math.round(d.HeadDepNorm * 100) / 100 : "-";
+    const headDepBadge = d.HeadDepHigh ? " 🔺" : "";
     const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
     const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
     const bpTxt = (typeof d.ArmorBreakpointScore === "number") ? Math.round(d.ArmorBreakpointScore * 100) / 100 : "-";
@@ -63,6 +66,7 @@ export function renderTable(list, onRowClick) {
         <td>${susTxt}</td>
         <td>${relTxt}</td>
         <td>${rngTxt}</td>
+        <td>${headDepTxt}${headDepBadge}${headDepNormTxt !== "-" ? `<div class="subtle">${headDepNormTxt}</div>` : ""}</td>
         <td>${armTxt}</td>
         <td>${bpTxt}</td>
         <td>${volTxt}</td>
