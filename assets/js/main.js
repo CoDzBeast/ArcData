@@ -214,6 +214,11 @@ function updateUI() {
     const skillFloor01 = skillFloorParts.length
       ? (skillFloorParts.reduce((a, b) => a + b, 0) / skillFloorParts.length)
       : null;
+    const skillCeilParts = [d.CritLeverageNorm, d.HandlingIndexNorm, d.HeadDepNorm]
+      .filter(v => typeof v === "number" && isFinite(v));
+    const skillCeiling01 = skillCeilParts.length
+      ? (skillCeilParts.reduce((a, b) => a + b, 0) / skillCeilParts.length)
+      : null;
 
     return {
       ...d,
@@ -225,6 +230,8 @@ function updateUI() {
       KillsPerMagNorm: normalized.nKillsPerMag,
       SkillFloorScore01: skillFloor01,
       SkillFloorScore: typeof skillFloor01 === "number" ? Math.round(skillFloor01 * 1000) / 10 : null,
+      SkillCeilingScore01: skillCeiling01,
+      SkillCeilingScore: typeof skillCeiling01 === "number" ? Math.round(skillCeiling01 * 1000) / 10 : null,
       Score: score,
       Score01: score01,
       DistanceBandScores: bandScores.scores,
@@ -436,6 +443,11 @@ function showDetails(name) {
   const skillFloor01 = skillFloorParts.length
     ? (skillFloorParts.reduce((a, b) => a + b, 0) / skillFloorParts.length)
     : null;
+  const skillCeilingParts = [critLevNorm, handlingNorm, headDepNorm]
+    .filter(v => typeof v === "number" && isFinite(v));
+  const skillCeiling01 = skillCeilingParts.length
+    ? (skillCeilingParts.reduce((a, b) => a + b, 0) / skillCeilingParts.length)
+    : null;
 
   const firingMode = d['Firing Mode'] || 'N/A';
   const armorPenAttr = d['Armor Pen'] || 'N/A';
@@ -472,6 +484,7 @@ function showDetails(name) {
     ["Exposure (Inv)", normalized.nExposure],
     ["Mobility Cost (Inv)", normalized.nMobilityCost],
     ["Skill Floor", skillFloor01],
+    ["Skill Ceiling", skillCeiling01],
   ];
 
   const bandScoreRows = Object.entries(bandScores.scores)
@@ -483,6 +496,7 @@ function showDetails(name) {
       <div class="grid2">
         <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Skill Floor</b><span>${skillFloor01 !== null ? (skillFloor01 * 100).toFixed(1) : "-"}</span></div>
+        <div class="kv"><b>Skill Ceiling</b><span>${skillCeiling01 !== null ? (skillCeiling01 * 100).toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Role Dominance</b><span>${dominanceTxt}${dominanceBadge ? ` <span class="subtle">(${dominanceBadge})</span>` : ""}</span></div>
         <div class="kv"><b>${zone} TTK vs ${armor}</b><span>${ttk ? ttk.toFixed(2)+"s" : "-"}</span></div>
         <div class="kv"><b>Exposure Time</b><span>${exposureTxt}</span></div>

@@ -88,6 +88,10 @@ export function renderTable(list, onRowClick) {
     const skillFloorCell = (skillFloorTxt === "-")
       ? "-"
       : `${skillFloorTxt}<div class="subtle">${typeof d.KillsPerMagNorm === "number" ? `K/Mag ${Math.round(d.KillsPerMagNorm * 100) / 100}` : "Head/Cons/K/Mag"}</div>`;
+    const skillCeilingTxt = (typeof d.SkillCeilingScore === "number") ? d.SkillCeilingScore.toFixed(1) : "-";
+    const skillCeilingCell = (skillCeilingTxt === "-")
+      ? "-"
+      : `${skillCeilingTxt}<div class="subtle">Crit/Handling/Head</div>`;
     const bpTxt = (typeof d.ArmorBreakpointScore === "number") ? Math.round(d.ArmorBreakpointScore * 100) / 100 : "-";
 
     return `
@@ -110,6 +114,7 @@ export function renderTable(list, onRowClick) {
         <td>${armTxt}</td>
         <td>${armorPenCell}</td>
         <td>${bpTxt}</td>
+        <td>${skillCeilingCell}</td>
         <td>${skillFloorCell}</td>
         <td>${consTxt}</td>
         <td>${volTxt}</td>
