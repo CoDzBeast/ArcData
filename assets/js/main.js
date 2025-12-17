@@ -2,8 +2,8 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics } from './metrics.js';
-import { safeNum, escapeHtml } from './utils.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats } from './metrics.js';
+import { safeNum, escapeHtml, normalize } from './utils.js';
 
 let rawData = [], chart;
 let lastSort = { key: "Score", dir: "desc" };
@@ -41,6 +41,8 @@ function updateUI() {
   const ttkKey = `${zone} TTK ${armor}`;
   const stkKey = `${zone} STK ${armor}`;
 
+  const headshotStats = headshotDependencyStats(rawData, armor);
+
   const filtered = rawData.filter(d => {
     const matchCat = (cat === 'All' || d.Category === cat);
     const matchSearch = (d.Name || "").toLowerCase().includes(search);
@@ -72,6 +74,11 @@ function updateUI() {
     const armorCons = armorConsistency(d, zone);
     const vol = ttkVolatility(d, zone);
     const armorBreak = armorBreakpoint(d);
+    const headDep = headshotDependency(d, armor);
+    const headDepNorm = (typeof headshotStats.min === "number" && typeof headshotStats.max === "number")
+      ? normalize(headDep, headshotStats.min, headshotStats.max)
+      : null;
+    const headDepHigh = (typeof headDep === "number" && typeof headshotStats.p75 === "number") ? headDep > headshotStats.p75 : false;
 
     return {
       ...d,
@@ -84,6 +91,9 @@ function updateUI() {
       Handling: handling,
       ArmorCons: armorCons,
       Vol: vol,
+      HeadDep: headDep,
+      HeadDepNorm: headDepNorm,
+      HeadDepHigh: headDepHigh,
       ArmorBreakAvg: armorBreak.avgDelta,
       ArmorBreakDeltas: armorBreak
     };
@@ -119,6 +129,8 @@ function updateUI() {
 function showDetails(name) {
   const { armor, zone } = getControlState();
 
+  const headshotStats = headshotDependencyStats(rawData, armor);
+
   const d = rawData.find(w => w.Name === name);
   if (!d) return;
 
@@ -134,6 +146,11 @@ function showDetails(name) {
   const armorCons = armorConsistency(d, zone);
   const armorBreak = armorBreakpoint(d);
   const vol = ttkVolatility(d, zone);
+  const headDep = headshotDependency(d, armor);
+  const headDepNorm = (typeof headshotStats.min === "number" && typeof headshotStats.max === "number")
+    ? normalize(headDep, headshotStats.min, headshotStats.max)
+    : null;
+  const headDepHigh = (typeof headDep === "number" && typeof headshotStats.p75 === "number") ? headDep > headshotStats.p75 : false;
 
   const ttkKey = `${zone} TTK ${armor}`;
   const stkKey = `${zone} STK ${armor}`;
@@ -219,6 +236,8 @@ function showDetails(name) {
         <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
         <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>
         <div class="kv"><b>TTK Volatility</b><span>${typeof vol==="number" ? vol.toFixed(2) : "-"}</span></div>
+        <div class="kv"><b>Headshot Dependency</b><span>${typeof headDep==="number" ? headDep.toFixed(2) : "-"}${headDepHigh ? " 🔺" : ""}</span></div>
+        <div class="kv"><b>Normalized Dependency</b><span>${typeof headDepNorm==="number" ? Math.round(headDepNorm*100)/100 : "-"}</span></div>
       </div>
 
       <div class="grid2" style="margin-top:10px;">
