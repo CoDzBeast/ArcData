@@ -148,6 +148,31 @@ export function damagePerCycle(d) {
   return mag * dmg;
 }
 
+export function counterScore({ headDepNorm, armorNorm, reloadNorm, killsPerMagNorm }) {
+  const parts = [];
+
+  if (typeof headDepNorm === "number" && isFinite(headDepNorm)) {
+    parts.push(invert01(headDepNorm));
+  }
+
+  if (typeof armorNorm === "number" && isFinite(armorNorm)) {
+    parts.push(armorNorm);
+  }
+
+  if (typeof reloadNorm === "number" && isFinite(reloadNorm)) {
+    parts.push(reloadNorm);
+  }
+
+  if (typeof killsPerMagNorm === "number" && isFinite(killsPerMagNorm)) {
+    parts.push(killsPerMagNorm);
+  }
+
+  if (!parts.length) return { counterScore01: null, counterScore: null };
+
+  const counterScore01 = parts.reduce((a, b) => a + b, 0) / parts.length;
+  return { counterScore01, counterScore: Math.round(counterScore01 * 1000) / 10 };
+}
+
 export function headshotDependency(d, armor) {
   const body = safeNum(d[`Body TTK ${armor}`]);
   const head = safeNum(d[`Head TTK ${armor}`]);
