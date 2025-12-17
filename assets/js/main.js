@@ -2,7 +2,7 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness, critLeverage } from './metrics.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness, critLeverage, distanceBandScores } from './metrics.js';
 import { safeNum, escapeHtml, normalize, invert01 } from './utils.js';
 
 let rawData = [], chart;
@@ -202,6 +202,7 @@ function updateUI() {
     }, ranges);
 
     const { score, score01 } = computeScore(normalized);
+    const bandScores = distanceBandScores(d.Range, d.RangeScore, maxRangeByCat[d.Category], score01);
 
     return {
       ...d,
@@ -211,7 +212,9 @@ function updateUI() {
       ExposureTimeNorm: normalized.nExposure,
       MobilityCostNorm: normalized.nMobilityCost,
       Score: score,
-      Score01: score01
+      Score01: score01,
+      DistanceBandScores: bandScores.scores,
+      DistanceBandScore01: bandScores.score01
     };
   });
 
@@ -388,7 +391,8 @@ function showDetails(name) {
     mobilityCost
   }, ranges);
 
-  const { score } = computeScore(normalized);
+  const { score, score01 } = computeScore(normalized);
+  const bandScores = distanceBandScores(range, rangeScore, maxRange, score01);
 
   const firingMode = d['Firing Mode'] || 'N/A';
   const armorPenAttr = d['Armor Pen'] || 'N/A';
@@ -426,6 +430,10 @@ function showDetails(name) {
     ["Mobility Cost (Inv)", normalized.nMobilityCost],
   ];
 
+  const bandScoreRows = Object.entries(bandScores.scores)
+    .map(([label, val]) => `<div class="kv"><b>${label} Band</b><span>${typeof val === "number" ? val.toFixed(1) : '-'}</span></div>`)
+    .join("");
+
   const statsHtml = `
     <div style="margin-top:14px;">
       <div class="grid2">
@@ -457,6 +465,11 @@ function showDetails(name) {
           <div class="kv"><b>Headshot Dependency</b><span>${typeof headDep==="number" ? headDep.toFixed(2) : "-"}${headDepHigh ? " 🔺" : ""}</span></div>
           <div class="kv"><b>Normalized Dependency</b><span>${typeof headDepNorm==="number" ? Math.round(headDepNorm*100)/100 : "-"}</span></div>
         </div>
+
+      <h4 style="margin:10px 0 6px;">Distance Band Scores</h4>
+      <div class="grid2">
+        ${bandScoreRows}
+      </div>
 
       <div class="grid2" style="margin-top:10px;">
         ${armorBreakRows}
