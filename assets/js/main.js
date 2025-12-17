@@ -2,8 +2,8 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle } from './metrics.js';
-import { safeNum, escapeHtml, normalize } from './utils.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness } from './metrics.js';
+import { safeNum, escapeHtml, normalize, invert01 } from './utils.js';
 
 let rawData = [], chart;
 let lastSort = { key: "Score", dir: "desc" };
@@ -51,6 +51,7 @@ function updateUI() {
 
   const maxRangeByCat = {};
   const maxDmgCycleByCat = {};
+  const armorPenStatsByCat = {};
   const handlingValues = rawData
     .map(handlingIndex)
     .filter(v => typeof v === "number" && isFinite(v));
@@ -74,6 +75,14 @@ function updateUI() {
     const dpc = damagePerCycle(d);
     if (typeof dpc === "number" && isFinite(dpc)) {
       maxDmgCycleByCat[c] = Math.max(maxDmgCycleByCat[c] || 0, dpc);
+    }
+
+    const ap = armorPenEffectiveness(d, zone);
+    if (typeof ap.deltaRatio === "number" && isFinite(ap.deltaRatio)) {
+      const current = armorPenStatsByCat[c] || { min: ap.deltaRatio, max: ap.deltaRatio };
+      current.min = Math.min(current.min, ap.deltaRatio);
+      current.max = Math.max(current.max, ap.deltaRatio);
+      armorPenStatsByCat[c] = current;
     }
   });
 
@@ -120,6 +129,10 @@ function updateUI() {
     const armorCons = armorConsistency(d, zone);
     const vol = ttkVolatility(d, zone);
     const armorBreak = armorBreakpoint(d);
+    const armorPen = armorPenEffectiveness(d, zone);
+    const armorPenNorm = (typeof armorPen.deltaRatio === "number" && armorPenStatsByCat[category])
+      ? invert01(normalize(armorPen.deltaRatio, armorPenStatsByCat[category].min, armorPenStatsByCat[category].max))
+      : null;
     const headDep = headshotDependency(d, armor);
     const headDepNorm = (typeof headshotStats.min === "number" && typeof headshotStats.max === "number")
       ? normalize(headDep, headshotStats.min, headshotStats.max)
@@ -151,7 +164,10 @@ function updateUI() {
       HeadDepNorm: headDepNorm,
       HeadDepHigh: headDepHigh,
       ArmorBreakAvg: armorBreak.avgDelta,
-      ArmorBreakDeltas: armorBreak
+      ArmorBreakDeltas: armorBreak,
+      ArmorPenDelta: armorPen.deltaRatio,
+      ArmorPenDeltaSeconds: armorPen.deltaSeconds,
+      ArmorPenScore: armorPenNorm
     };
   });
 
@@ -220,6 +236,7 @@ function showDetails(name) {
   const range = safeNum(d.Range);
   const DPS = safeNum(d.DPS);
   const dmgPerCycle = damagePerCycle(d);
+  const armorPen = armorPenEffectiveness(d, zone);
   const reloadTaxVal = reloadTax(reload, ttk);
   const weight = safeNum(d.Weight);
   const agility = safeNum(d.Agility);
@@ -269,6 +286,16 @@ function showDetails(name) {
   const maxDmgCycle = dmgCycleValues.length ? Math.max(...dmgCycleValues) : null;
   const dmgPerCycleNorm = (typeof dmgPerCycle === "number" && typeof maxDmgCycle === "number" && maxDmgCycle > 0)
     ? dmgPerCycle / maxDmgCycle
+    : null;
+  const armorPenValues = rawData
+    .filter(x => (x.Category || "Unknown") === category)
+    .map(x => armorPenEffectiveness(x, zone).deltaRatio)
+    .filter(v => typeof v === "number" && isFinite(v));
+  const armorPenRange = armorPenValues.length
+    ? { min: Math.min(...armorPenValues), max: Math.max(...armorPenValues) }
+    : null;
+  const armorPenNorm = (typeof armorPen.deltaRatio === "number" && armorPenRange)
+    ? invert01(normalize(armorPen.deltaRatio, armorPenRange.min, armorPenRange.max))
     : null;
 
   const whole = rawData.map(w => {
@@ -342,7 +369,7 @@ function showDetails(name) {
   const { score } = computeScore(normalized);
 
   const firingMode = d['Firing Mode'] || 'N/A';
-  const armorPen = d['Armor Pen'] || 'N/A';
+  const armorPenAttr = d['Armor Pen'] || 'N/A';
   const crit = d['Crit Multi'] || '1.0';
   const sell = d.Sell ? `$${Number(d.Sell).toLocaleString()}` : '$0';
 
@@ -357,6 +384,9 @@ function showDetails(name) {
   const mobilityCostTxt = (typeof mobilityCost === "number") ? mobilityCost.toFixed(2) + "s" : "-";
   const mobilityCostNormTxt = (typeof normalized.nMobilityCost === "number") ? Math.round(normalized.nMobilityCost * 100) / 100 : "-";
   const weightFactorTxt = (typeof weightFactor === "number") ? Math.round(weightFactor * 100) / 100 : "-";
+  const armorPenDeltaTxt = (typeof armorPen.deltaRatio === "number") ? `${(armorPen.deltaRatio * 100).toFixed(1)}%` : "-";
+  const armorPenSecondsTxt = (typeof armorPen.deltaSeconds === "number") ? `${armorPen.deltaSeconds.toFixed(2)}s` : "-";
+  const armorPenNormTxt = (typeof armorPenNorm === "number") ? Math.round(armorPenNorm * 100) / 100 : "-";
 
   const bars = [
     ["TTK", normalized.nTTK],
@@ -366,6 +396,7 @@ function showDetails(name) {
     ["Damage/Cycle (Cat)", dmgPerCycleNorm],
     ["Reload Penalty", normalized.nReloadPenalty],
     ["Armor", normalized.nArmor],
+    ["Armor Pen (Cat)", armorPenNorm],
     ["Armor BP", normalized.nArmorBreak],
     ["Exposure (Inv)", normalized.nExposure],
     ["Mobility Cost (Inv)", normalized.nMobilityCost],
@@ -392,6 +423,8 @@ function showDetails(name) {
         <div class="kv"><b>Weight Factor</b><span>${weightFactorTxt}</span></div>
         <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
         <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
+        <div class="kv"><b>Armor Pen ΔH vs M</b><span>${armorPenSecondsTxt} (${armorPenDeltaTxt})</span></div>
+        <div class="kv"><b>Armor Pen (Norm)</b><span>${armorPenNormTxt}</span></div>
         <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>
         <div class="kv"><b>Consistency Score</b><span>${typeof normalized.nConsistency==="number" ? Math.round(normalized.nConsistency*100)/100 : "-"}</span></div>
         <div class="kv"><b>TTK Volatility</b><span>${typeof vol==="number" ? vol.toFixed(2) : "-"}</span></div>
@@ -407,7 +440,7 @@ function showDetails(name) {
 
       <div class="grid2">
         <div class="kv"><b>Firing Mode</b><span>${firingMode}</span></div>
-        <div class="kv"><b>Armor Pen</b><span>${armorPen}</span></div>
+        <div class="kv"><b>Armor Pen</b><span>${armorPenAttr}</span></div>
         <div class="kv"><b>Crit Multi</b><span>${crit}x</span></div>
         <div class="kv"><b>Handling Index</b><span>${handling ? handling.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Handling (Norm)</b><span>${typeof handlingNorm === "number" ? Math.round(handlingNorm * 100) / 100 : "-"}</span></div>

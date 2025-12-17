@@ -126,6 +126,20 @@ export function armorBreakpoint(d) {
   return { deltaL, deltaM, deltaH, avgDelta };
 }
 
+export function armorPenEffectiveness(d, zone) {
+  const ttkM = getZoneTTK(d, zone, "M");
+  const ttkH = getZoneTTK(d, zone, "H");
+
+  if (!ttkM || !ttkH) {
+    return { deltaSeconds: null, deltaRatio: null };
+  }
+
+  const deltaSeconds = ttkH - ttkM;
+  const deltaRatio = (ttkM > 0) ? (deltaSeconds / ttkM) : null;
+
+  return { deltaSeconds, deltaRatio };
+}
+
 export function damagePerCycle(d) {
   const mag = safeNum(d.Mag);
   const dmg = safeNum(d.DMG);
