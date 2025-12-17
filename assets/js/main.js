@@ -3,11 +3,12 @@ import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls,
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
 import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness, critLeverage, distanceBandScores } from './metrics.js';
-import { safeNum, escapeHtml, normalize, invert01 } from './utils.js';
+import { safeNum, escapeHtml, normalize, invert01, stddev } from './utils.js';
 
 let rawData = [], chart;
 let lastSort = { key: "Score", dir: "desc" };
 let roleDominanceByName = {};
+let outlierByName = {};
 
 init();
 
@@ -240,7 +241,17 @@ function updateUI() {
   });
 
   applyRoleDominance(scored);
-  roleDominanceByName = scored.reduce((acc, weapon) => {
+  const scoredWithOutliers = applyOutlierIndex(scored);
+
+  outlierByName = scoredWithOutliers.reduce((acc, weapon) => {
+    acc[weapon.Name] = {
+      index: weapon.OutlierIndex,
+      warning: weapon.OutlierWarning,
+      categoryAverage: weapon.CategoryAverageScore
+    };
+    return acc;
+  }, {});
+  roleDominanceByName = scoredWithOutliers.reduce((acc, weapon) => {
     acc[weapon.Name] = {
       index: weapon.RoleDominanceIndex,
       top: weapon.RoleDominanceTop10
@@ -248,13 +259,13 @@ function updateUI() {
     return acc;
   }, {});
 
-  scored.sort((a, b) => compareRows(a, b, lastSort));
+  scoredWithOutliers.sort((a, b) => compareRows(a, b, lastSort));
 
-  setStatus(`Showing ${scored.length} of ${rawData.length}`);
+  setStatus(`Showing ${scoredWithOutliers.length} of ${rawData.length}`);
   updateChartTitle(zone, armor, chartMetric);
 
-  chart = renderChart(scored, chartMetric, chart);
-  renderTable(scored, (name) => showDetails(name));
+  chart = renderChart(scoredWithOutliers, chartMetric, chart);
+  renderTable(scoredWithOutliers, (name) => showDetails(name));
 }
 
 function showDetails(name) {
@@ -357,6 +368,10 @@ function showDetails(name) {
   const dominance = roleDominanceByName[d.Name] || {};
   const dominanceTxt = (typeof dominance.index === "number") ? `${dominance.index.toFixed(1)}%` : "-";
   const dominanceBadge = dominance.top ? "🏆 Top 10%" : "";
+  const outlierInfo = outlierByName[d.Name] || {};
+  const outlierTxt = (typeof outlierInfo.index === "number") ? `${outlierInfo.index.toFixed(2)}σ` : "-";
+  const outlierBadge = outlierInfo.warning ? "⚠️ Above Cat Avg" : "";
+  const outlierAvgTxt = (typeof outlierInfo.categoryAverage === "number") ? outlierInfo.categoryAverage.toFixed(1) : "-";
 
   const whole = rawData.map(w => {
     const c = w.Category || "Unknown";
@@ -495,6 +510,8 @@ function showDetails(name) {
     <div style="margin-top:14px;">
       <div class="grid2">
         <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
+        <div class="kv"><b>Outlier Index</b><span>${outlierTxt}${outlierBadge ? ` <span class="warn-pill sm">${outlierBadge}</span>` : ""}</span></div>
+        <div class="kv"><b>Category Avg (Score)</b><span>${outlierAvgTxt}</span></div>
         <div class="kv"><b>Skill Floor</b><span>${skillFloor01 !== null ? (skillFloor01 * 100).toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Skill Ceiling</b><span>${skillCeiling01 !== null ? (skillCeiling01 * 100).toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Role Dominance</b><span>${dominanceTxt}${dominanceBadge ? ` <span class="subtle">(${dominanceBadge})</span>` : ""}</span></div>
@@ -609,4 +626,44 @@ function applyRoleDominance(list) {
   });
 
   return list;
+}
+
+function applyOutlierIndex(list) {
+  const scoresByCat = {};
+
+  list.forEach((item) => {
+    const cat = item.Category || "Unknown";
+    const score = item.Score;
+    if (typeof score === "number" && isFinite(score)) {
+      if (!scoresByCat[cat]) scoresByCat[cat] = [];
+      scoresByCat[cat].push(score);
+    }
+  });
+
+  const statsByCat = {};
+  Object.entries(scoresByCat).forEach(([cat, values]) => {
+    if (!values.length) return;
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const sigma = stddev(values);
+    statsByCat[cat] = { mean, sigma };
+  });
+
+  return list.map((item) => {
+    const stats = statsByCat[item.Category || "Unknown"];
+    const score = item.Score;
+    let index = null;
+    let warning = false;
+
+    if (stats && typeof stats.sigma === "number" && stats.sigma > 0 && typeof score === "number" && isFinite(score)) {
+      index = (score - stats.mean) / stats.sigma;
+      warning = index > 1.5;
+    }
+
+    return {
+      ...item,
+      OutlierIndex: index,
+      OutlierWarning: warning,
+      CategoryAverageScore: stats ? stats.mean : null
+    };
+  });
 }
