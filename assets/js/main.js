@@ -2,7 +2,7 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats } from './metrics.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax } from './metrics.js';
 import { safeNum, escapeHtml, normalize } from './utils.js';
 
 let rawData = [], chart;
@@ -65,6 +65,7 @@ function updateUI() {
     const ttk = getZoneTTK(d, zone, armor);
     const stk = getZoneSTK(d, zone, armor);
     const reload = safeNum(d.Reload);
+    const reloadTaxVal = reloadTax(reload, ttk);
 
     const sustain = (zone === "Overall")
       ? sustainedDpsApprox(d, null, null, ttk, stk)
@@ -87,6 +88,7 @@ function updateUI() {
       TTK: ttk,
       STK: stk,
       Reload: reload,
+      ReloadTax: reloadTaxVal,
       Sustain: sustain,
       Handling: handling,
       ArmorCons: armorCons,
@@ -108,6 +110,7 @@ function updateUI() {
       handling: d.Handling,
       rangeScore: d.RangeScore,
       reload: d.Reload,
+      reloadTax: d.ReloadTax,
       armorCons: d.ArmorCons,
       armorBreakAvg: d.ArmorBreakAvg,
       volatility: d.Vol
@@ -149,6 +152,7 @@ function showDetails(name) {
   const reload = safeNum(d.Reload);
   const range = safeNum(d.Range);
   const DPS = safeNum(d.DPS);
+  const reloadTaxVal = reloadTax(reload, ttk);
 
   const handling = handlingIndex(d);
   const armorCons = armorConsistency(d, zone);
@@ -178,6 +182,8 @@ function showDetails(name) {
 
     const wTTK = (zone === "Overall") ? getZoneTTK(w, "Overall", armor) : safeNum(w[ttkKey]);
     const wSTK = (zone === "Overall") ? getZoneSTK(w, "Overall", armor) : safeNum(w[stkKey]);
+    const wReload = safeNum(w.Reload);
+    const wReloadTax = reloadTax(wReload, wTTK);
 
     const wSustain = (zone === "Overall")
       ? sustainedDpsApprox(w, null, null, wTTK, wSTK)
@@ -185,7 +191,8 @@ function showDetails(name) {
 
     return {
       TTK: wTTK,
-      Reload: safeNum(w.Reload),
+      Reload: wReload,
+      ReloadTax: wReloadTax,
       Sustain: wSustain,
       Handling: handlingIndex(w),
       ArmorCons: armorConsistency(w, zone),
@@ -196,7 +203,7 @@ function showDetails(name) {
   });
 
   const ranges = buildRanges(whole.map(x => ({
-    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg, Vol: x.Vol
+    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ReloadTax: x.ReloadTax, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg, Vol: x.Vol
   })));
 
   const normalized = normalizeMetrics({
@@ -205,6 +212,7 @@ function showDetails(name) {
     handling,
     rangeScore,
     reload,
+    reloadTax: reloadTaxVal,
     armorCons,
     armorBreakAvg: armorBreak.avgDelta,
     volatility: vol
@@ -229,7 +237,7 @@ function showDetails(name) {
     ["Sustain", normalized.nSustain],
     ["Handling", normalized.nHandling],
     ["Range", normalized.nRange],
-    ["Reload", normalized.nReload],
+    ["Reload Penalty", normalized.nReloadPenalty],
     ["Armor", normalized.nArmor],
     ["Armor BP", normalized.nArmorBreak],
   ];
@@ -242,6 +250,8 @@ function showDetails(name) {
         <div class="kv"><b>DPS</b><span>${DPS ?? "-"}</span></div>
         <div class="kv"><b>Sustained DPS</b><span>${typeof sustain==="number" ? sustain.toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Reload</b><span>${reload ? reload.toFixed(2)+"s" : "-"}</span></div>
+        <div class="kv"><b>Reload Tax</b><span>${typeof reloadTaxVal==="number" ? (reloadTaxVal*100).toFixed(1)+"%" : "-"}</span></div>
+        <div class="kv"><b>Reload Penalty (Norm)</b><span>${typeof normalized.nReloadPenalty==="number" ? Math.round(normalized.nReloadPenalty*100)/100 : "-"}</span></div>
         <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
         <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
         <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>
