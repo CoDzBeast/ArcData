@@ -91,6 +91,7 @@
                 <tr>
                   <th class="sortable" data-sort="Name">Weapon</th>
                   <th class="sortable" data-sort="Score">Score</th>
+                  <th class="sortable" data-sort="RoleDom">Role Dominance</th>
                   <th class="sortable" data-sort="TTK">TTK</th>
                   <th class="sortable" data-sort="Exposure">Exposure</th>
                   <th class="sortable" data-sort="Mobility">Mobility Cost</th>
@@ -120,6 +121,7 @@
             Exposure factors in weight: ExposureTime = Overall TTK × (1 + WeightFactor); lower exposure implies better survivability. Mobility Cost = (Weight ÷ Agility) × Overall TTK (inverse normalized).
             Eng/Mag = floor(Mag ÷ STK). ⚠️ flag indicates weapons that must reload after every kill. Dmg/Cycle = Mag × Damage per shot with category-normalized value in the cell.
             Handling column shows the weighted handling index and its dataset-normalized value (Stability 40% / Agility 40% / Stealth 20%).
+            Role Dominance ranks Meta score within the weapon's category and converts it to a percentile (0–100); 🏆 marks the top 10% of each role.
           </div>
         </div>
       </div>
