@@ -33,6 +33,7 @@ function getSortValue(row, key) {
     case "TTK": return row.TTK ?? null;
     case "DPS": return row.DPS ?? null;
     case "Sustain": return row.Sustain ?? null;
+    case "Engage": return row.EngagementCapacity ?? null;
     case "Reload": return row.Reload ?? null;
     case "Range": return row.Range ?? null;
     case "HeadDep": return row.HeadDep ?? null;
