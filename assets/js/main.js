@@ -2,7 +2,7 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness } from './metrics.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle, armorPenEffectiveness, critLeverage } from './metrics.js';
 import { safeNum, escapeHtml, normalize, invert01 } from './utils.js';
 
 let rawData = [], chart;
@@ -57,6 +57,12 @@ function updateUI() {
     .filter(v => typeof v === "number" && isFinite(v));
   const handlingRange = handlingValues.length
     ? { min: Math.min(...handlingValues), max: Math.max(...handlingValues) }
+    : { min: 0, max: 1 };
+  const critLeverageValues = rawData
+    .map(d => critLeverage(d, armor))
+    .filter(v => typeof v === "number" && isFinite(v));
+  const critLeverageRange = critLeverageValues.length
+    ? { min: Math.min(...critLeverageValues), max: Math.max(...critLeverageValues) }
     : { min: 0, max: 1 };
   const weightValues = rawData
     .map(d => safeNum(d.Weight))
@@ -133,6 +139,10 @@ function updateUI() {
     const armorPenNorm = (typeof armorPen.deltaRatio === "number" && armorPenStatsByCat[category])
       ? invert01(normalize(armorPen.deltaRatio, armorPenStatsByCat[category].min, armorPenStatsByCat[category].max))
       : null;
+    const critLev = critLeverage(d, armor);
+    const critLevNorm = (typeof critLev === "number")
+      ? normalize(critLev, critLeverageRange.min, critLeverageRange.max)
+      : null;
     const headDep = headshotDependency(d, armor);
     const headDepNorm = (typeof headshotStats.min === "number" && typeof headshotStats.max === "number")
       ? normalize(headDep, headshotStats.min, headshotStats.max)
@@ -160,6 +170,8 @@ function updateUI() {
       MobilityCost: mobilityCost,
       DamagePerCycle: dmgPerCycle,
       DamagePerCycleNorm: dmgPerCycleNorm,
+      CritLeverage: critLev,
+      CritLeverageNorm: critLevNorm,
       HeadDep: headDep,
       HeadDepNorm: headDepNorm,
       HeadDepHigh: headDepHigh,
@@ -216,6 +228,12 @@ function showDetails(name) {
   const { armor, zone } = getControlState();
 
   const headshotStats = headshotDependencyStats(rawData, armor);
+  const critLeverageValues = rawData
+    .map(d => critLeverage(d, armor))
+    .filter(v => typeof v === "number" && isFinite(v));
+  const critLeverageRange = critLeverageValues.length
+    ? { min: Math.min(...critLeverageValues), max: Math.max(...critLeverageValues) }
+    : { min: 0, max: 1 };
   const handlingValues = rawData
     .map(handlingIndex)
     .filter(v => typeof v === "number" && isFinite(v));
@@ -262,6 +280,10 @@ function showDetails(name) {
   const armorCons = armorConsistency(d, zone);
   const armorBreak = armorBreakpoint(d);
   const vol = ttkVolatility(d, zone);
+  const critLev = critLeverage(d, armor);
+  const critLevNorm = (typeof critLev === "number")
+    ? normalize(critLev, critLeverageRange.min, critLeverageRange.max)
+    : null;
   const headDep = headshotDependency(d, armor);
   const headDepNorm = (typeof headshotStats.min === "number" && typeof headshotStats.max === "number")
     ? normalize(headDep, headshotStats.min, headshotStats.max)
@@ -387,6 +409,8 @@ function showDetails(name) {
   const armorPenDeltaTxt = (typeof armorPen.deltaRatio === "number") ? `${(armorPen.deltaRatio * 100).toFixed(1)}%` : "-";
   const armorPenSecondsTxt = (typeof armorPen.deltaSeconds === "number") ? `${armorPen.deltaSeconds.toFixed(2)}s` : "-";
   const armorPenNormTxt = (typeof armorPenNorm === "number") ? Math.round(armorPenNorm * 100) / 100 : "-";
+  const critLevTxt = (typeof critLev === "number") ? `${critLev.toFixed(2)}s` : "-";
+  const critLevNormTxt = (typeof critLevNorm === "number") ? Math.round(critLevNorm * 100) / 100 : "-";
 
   const bars = [
     ["TTK", normalized.nTTK],
@@ -424,13 +448,15 @@ function showDetails(name) {
         <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
         <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
         <div class="kv"><b>Armor Pen ΔH vs M</b><span>${armorPenSecondsTxt} (${armorPenDeltaTxt})</span></div>
-        <div class="kv"><b>Armor Pen (Norm)</b><span>${armorPenNormTxt}</span></div>
-        <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>
-        <div class="kv"><b>Consistency Score</b><span>${typeof normalized.nConsistency==="number" ? Math.round(normalized.nConsistency*100)/100 : "-"}</span></div>
-        <div class="kv"><b>TTK Volatility</b><span>${typeof vol==="number" ? vol.toFixed(2) : "-"}</span></div>
-        <div class="kv"><b>Headshot Dependency</b><span>${typeof headDep==="number" ? headDep.toFixed(2) : "-"}${headDepHigh ? " 🔺" : ""}</span></div>
-        <div class="kv"><b>Normalized Dependency</b><span>${typeof headDepNorm==="number" ? Math.round(headDepNorm*100)/100 : "-"}</span></div>
-      </div>
+          <div class="kv"><b>Armor Pen (Norm)</b><span>${armorPenNormTxt}</span></div>
+          <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>
+          <div class="kv"><b>Consistency Score</b><span>${typeof normalized.nConsistency==="number" ? Math.round(normalized.nConsistency*100)/100 : "-"}</span></div>
+          <div class="kv"><b>TTK Volatility</b><span>${typeof vol==="number" ? vol.toFixed(2) : "-"}</span></div>
+          <div class="kv"><b>Crit Leverage</b><span>${critLevTxt}</span></div>
+          <div class="kv"><b>Crit Leverage (Norm)</b><span>${critLevNormTxt}</span></div>
+          <div class="kv"><b>Headshot Dependency</b><span>${typeof headDep==="number" ? headDep.toFixed(2) : "-"}${headDepHigh ? " 🔺" : ""}</span></div>
+          <div class="kv"><b>Normalized Dependency</b><span>${typeof headDepNorm==="number" ? Math.round(headDepNorm*100)/100 : "-"}</span></div>
+        </div>
 
       <div class="grid2" style="margin-top:10px;">
         ${armorBreakRows}

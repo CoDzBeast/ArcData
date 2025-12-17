@@ -69,6 +69,8 @@ export function renderTable(list, onRowClick) {
     const headDepTxt = (typeof d.HeadDep === "number") ? d.HeadDep.toFixed(2) : "-";
     const headDepNormTxt = (typeof d.HeadDepNorm === "number") ? Math.round(d.HeadDepNorm * 100) / 100 : "-";
     const headDepBadge = d.HeadDepHigh ? " 🔺" : "";
+    const critLevTxt = (typeof d.CritLeverage === "number") ? d.CritLeverage.toFixed(2) + "s" : "-";
+    const critLevNormTxt = (typeof d.CritLeverageNorm === "number") ? Math.round(d.CritLeverageNorm * 100) / 100 : "-";
     const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
     const armorPenDeltaTxt = (typeof d.ArmorPenDelta === "number") ? `${(d.ArmorPenDelta * 100).toFixed(1)}%` : "-";
     const armorPenSecondsTxt = (typeof d.ArmorPenDeltaSeconds === "number") ? `${d.ArmorPenDeltaSeconds.toFixed(2)}s` : "-";
@@ -95,6 +97,7 @@ export function renderTable(list, onRowClick) {
         <td>${handlingCell}</td>
         <td>${rngTxt}</td>
         <td>${headDepTxt}${headDepBadge}${headDepNormTxt !== "-" ? `<div class="subtle">${headDepNormTxt}</div>` : ""}</td>
+        <td>${critLevTxt}${critLevNormTxt !== "-" ? `<div class="subtle">${critLevNormTxt} norm</div>` : ""}</td>
         <td>${armTxt}</td>
         <td>${armorPenCell}</td>
         <td>${bpTxt}</td>

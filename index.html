@@ -102,6 +102,7 @@
                   <th class="sortable" data-sort="Handling">Handling</th>
                   <th class="sortable" data-sort="Range">Range</th>
                   <th class="sortable" data-sort="HeadDep">Head Dep</th>
+                  <th class="sortable" data-sort="CritLeverage">Crit Leverage</th>
                   <th class="sortable" data-sort="ArmorCons">Armor</th>
                   <th class="sortable" data-sort="ArmorPen">Armor Pen Eff</th>
                   <th class="sortable" data-sort="ArmorBP">Armor BP</th>
@@ -114,7 +115,7 @@
           </div>
           <div class="note">
             Armor = consistency vs armor scaling. Head Dep = Body/Head TTK ratio (normalized in cell, 🔺 = above dataset 75th percentile).
-            Armor BP = normalized armor breakpoint score (Body TTK deltas, higher is better). Consistency = normalized inverse volatility (0–1; higher is steadier). Vol = TTK volatility across 0/L/M/H (lower is better).
+            Crit Leverage = normalized benefit of precision ( (Body TTK − Head TTK) × Crit Multi ), higher is better. Armor BP = normalized armor breakpoint score (Body TTK deltas, higher is better). Consistency = normalized inverse volatility (0–1; higher is steadier). Vol = TTK volatility across 0/L/M/H (lower is better).
             Armor Pen Eff = normalized Heavy-vs-Medium TTK degradation within the weapon's category (lower delta, higher score). Shows raw delta in seconds/percent and category-normalized score.
             Exposure factors in weight: ExposureTime = Overall TTK × (1 + WeightFactor); lower exposure implies better survivability. Mobility Cost = (Weight ÷ Agility) × Overall TTK (inverse normalized).
             Eng/Mag = floor(Mag ÷ STK). ⚠️ flag indicates weapons that must reload after every kill. Dmg/Cycle = Mag × Damage per shot with category-normalized value in the cell.
