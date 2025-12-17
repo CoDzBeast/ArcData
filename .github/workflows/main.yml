@@ -3,7 +3,7 @@ name: Deploy Website
 on:
   push:
     branches: ["main"]
-  workflow_dispatch:      # This line enables the manual "Run workflow" button
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,12 +19,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Pages
-        uses: actions/setup-pages@v4
+        uses: actions/configure-pages@v4  # Changed from setup-pages to configure-pages
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '.' # This uploads your whole repo (index.html, csv, etc.)
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
