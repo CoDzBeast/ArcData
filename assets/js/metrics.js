@@ -191,6 +191,7 @@ export function buildRanges(list) {
     "ArmorCons",
     "ArmorBreakAvg",
     "Vol",
+    "KillsPerMag",
     "ExposureTime",
     "MobilityCost"
   ];
@@ -206,6 +207,7 @@ export function normalizeMetrics(values, ranges) {
   const nReloadPenalty = invert01(normalize(values.reloadTax, ranges.ReloadTax.min, ranges.ReloadTax.max));
   const nExposure = invert01(normalize(values.exposureTime, ranges.ExposureTime.min, ranges.ExposureTime.max));
   const nMobilityCost = invert01(normalize(values.mobilityCost, ranges.MobilityCost.min, ranges.MobilityCost.max));
+  const nKillsPerMag = normalize(values.killsPerMag, ranges.KillsPerMag.min, ranges.KillsPerMag.max);
 
   return {
     nTTK: invert01(normalize(values.ttk, ranges.TTK.min, ranges.TTK.max)),
@@ -218,7 +220,8 @@ export function normalizeMetrics(values, ranges) {
     nArmorBreak: invert01(normalize(values.armorBreakAvg, ranges.ArmorBreakAvg.min, ranges.ArmorBreakAvg.max)),
     nConsistency: invert01(normalize(values.volatility, ranges.Vol.min, ranges.Vol.max)),
     nExposure,
-    nMobilityCost
+    nMobilityCost,
+    nKillsPerMag
   };
 }
 

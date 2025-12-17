@@ -158,6 +158,7 @@ function updateUI() {
       STK: stk,
       Reload: reload,
       ReloadTax: reloadTaxVal,
+      KillsPerMag: engagementsPerMag,
       EngagementCapacity: engagementsPerMag,
       ReloadEveryKill: reloadEveryKill,
       Sustain: sustain,
@@ -198,12 +199,21 @@ function updateUI() {
       armorCons: d.ArmorCons,
       armorBreakAvg: d.ArmorBreakAvg,
       volatility: d.Vol,
+      killsPerMag: d.KillsPerMag,
       exposureTime: d.ExposureTime,
       mobilityCost: d.MobilityCost
     }, ranges);
 
     const { score, score01 } = computeScore(normalized);
     const bandScores = distanceBandScores(d.Range, d.RangeScore, score01);
+
+    const headshotFloor = invert01(d.HeadDepNorm);
+    const killsPerMagNorm = normalize(d.KillsPerMag, ranges.KillsPerMag.min, ranges.KillsPerMag.max);
+    const skillFloorParts = [headshotFloor, normalized.nConsistency, killsPerMagNorm]
+      .filter(v => typeof v === "number" && isFinite(v));
+    const skillFloor01 = skillFloorParts.length
+      ? (skillFloorParts.reduce((a, b) => a + b, 0) / skillFloorParts.length)
+      : null;
 
     return {
       ...d,
@@ -212,6 +222,9 @@ function updateUI() {
       ArmorBreakpointScore: normalized.nArmorBreak,
       ExposureTimeNorm: normalized.nExposure,
       MobilityCostNorm: normalized.nMobilityCost,
+      KillsPerMagNorm: normalized.nKillsPerMag,
+      SkillFloorScore01: skillFloor01,
+      SkillFloorScore: typeof skillFloor01 === "number" ? Math.round(skillFloor01 * 1000) / 10 : null,
       Score: score,
       Score01: score01,
       DistanceBandScores: bandScores.scores,
@@ -285,6 +298,7 @@ function showDetails(name) {
     ? Math.floor(mag / stk)
     : null;
   const reloadEveryKill = (typeof engagementsPerMag === "number") ? engagementsPerMag <= 1 : null;
+  const killsPerMag = engagementsPerMag;
 
   const handling = handlingIndex(d);
   const handlingNorm = (typeof handling === "number")
@@ -362,6 +376,10 @@ function showDetails(name) {
       ? sustainedDpsApprox(w, null, null, wTTK, wSTK)
       : sustainedDpsApprox(w, ttkKey, stkKey);
 
+    const wKillsPerMag = (typeof wMag === "number" && wMag > 0 && typeof wSTK === "number" && wSTK > 0)
+      ? Math.floor(wMag / wSTK)
+      : null;
+
     return {
       TTK: wTTK,
       Reload: wReload,
@@ -373,7 +391,8 @@ function showDetails(name) {
       RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null,
       Vol: ttkVolatility(w, zone),
       ExposureTime: wExposureTime,
-      MobilityCost: wMobilityCost
+      MobilityCost: wMobilityCost,
+      KillsPerMag: wKillsPerMag
     };
   });
 
@@ -388,7 +407,8 @@ function showDetails(name) {
     ArmorBreakAvg: x.ArmorBreakAvg,
     Vol: x.Vol,
     ExposureTime: x.ExposureTime,
-    MobilityCost: x.MobilityCost
+    MobilityCost: x.MobilityCost,
+    KillsPerMag: x.KillsPerMag
   })));
 
   const normalized = normalizeMetrics({
@@ -401,12 +421,21 @@ function showDetails(name) {
     armorCons,
     armorBreakAvg: armorBreak.avgDelta,
     volatility: vol,
+    killsPerMag,
     exposureTime,
     mobilityCost
   }, ranges);
 
   const { score, score01 } = computeScore(normalized);
   const bandScores = distanceBandScores(range, rangeScore, score01);
+
+  const headshotFloor = invert01(headDepNorm);
+  const killsPerMagNorm = normalize(killsPerMag, ranges.KillsPerMag.min, ranges.KillsPerMag.max);
+  const skillFloorParts = [headshotFloor, normalized.nConsistency, killsPerMagNorm]
+    .filter(v => typeof v === "number" && isFinite(v));
+  const skillFloor01 = skillFloorParts.length
+    ? (skillFloorParts.reduce((a, b) => a + b, 0) / skillFloorParts.length)
+    : null;
 
   const firingMode = d['Firing Mode'] || 'N/A';
   const armorPenAttr = d['Armor Pen'] || 'N/A';
@@ -442,6 +471,7 @@ function showDetails(name) {
     ["Armor BP", normalized.nArmorBreak],
     ["Exposure (Inv)", normalized.nExposure],
     ["Mobility Cost (Inv)", normalized.nMobilityCost],
+    ["Skill Floor", skillFloor01],
   ];
 
   const bandScoreRows = Object.entries(bandScores.scores)
@@ -452,6 +482,7 @@ function showDetails(name) {
     <div style="margin-top:14px;">
       <div class="grid2">
         <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
+        <div class="kv"><b>Skill Floor</b><span>${skillFloor01 !== null ? (skillFloor01 * 100).toFixed(1) : "-"}</span></div>
         <div class="kv"><b>Role Dominance</b><span>${dominanceTxt}${dominanceBadge ? ` <span class="subtle">(${dominanceBadge})</span>` : ""}</span></div>
         <div class="kv"><b>${zone} TTK vs ${armor}</b><span>${ttk ? ttk.toFixed(2)+"s" : "-"}</span></div>
         <div class="kv"><b>Exposure Time</b><span>${exposureTxt}</span></div>
