@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arc Raiders Master Database</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; }
+        .dashboard { max-width: 1200px; margin: auto; }
+        .controls { display: flex; gap: 20px; background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #334155; }
+        select, button { padding: 10px; border-radius: 6px; background: #0f172a; color: white; border: 1px solid #475569; cursor: pointer; }
+        h1 { color: #38bdf8; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+        th { background: #334155; color: #38bdf8; }
+        .best { color: #4ade80; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <h1>Arc Raiders: Master Weapon Database</h1>
+        
+        <div class="controls">
+            <div>
+                <label>Target Armor:</label>
+                <select id="armorLevel" onchange="updateView()">
+                    <option value="0">No Armor (0)</option>
+                    <option value="L">Light Armor (L)</option>
+                    <option value="M" selected>Medium Armor (M)</option>
+                    <option value="H">Heavy Armor (H)</option>
+                </select>
+            </div>
+            <div>
+                <label>Weapon Class:</label>
+                <select id="categoryFilter" onchange="updateView()">
+                    <option value="All">All Categories</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Time to Kill (TTK) Comparison</h3>
+            <p><small>Based on selected armor level. Lower bars = faster kills.</small></p>
+            <canvas id="ttkChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h3>Weapon Specifications</h3>
+            <div style="overflow-x: auto;">
+                <table id="statTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>DPS</th>
+                            <th>Mag</th>
+                            <th>Reload</th>
+                            <th>Range</th>
+                            <th>Stability</th>
+                            <th>Weight</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let rawData = [];
+        let chart;
+
+        Papa.parse("cleaned_weapons_full.csv", {
+            download: true,
+            header: true,
+            dynamicTyping: true,
+            complete: function(results) {
+                rawData = results.data.filter(d => d.Name);
+                setupFilters();
+                updateView();
+            }
+        });
+
+        function setupFilters() {
+            const cats = [...new Set(rawData.map(d => d.Category))];
+            const select = document.getElementById('categoryFilter');
+            cats.forEach(c => {
+                let o = document.createElement('option');
+                o.value = o.innerHTML = c;
+                select.appendChild(o);
+            });
+        }
+
+        function updateView() {
+            const armor = document.getElementById('armorLevel').value;
+            const category = document.getElementById('categoryFilter').value;
+            
+            let filtered = category === "All" ? rawData : rawData.filter(d => d.Category === category);
+            
+            // Sort by the specific Armor TTK selected
+            filtered.sort((a, b) => (a[`Body_TTK_${armor}`] || 99) - (b[`Body_TTK_${armor}`] || 99));
+
+            renderChart(filtered, armor);
+            renderTable(filtered);
+        }
+
+        function renderChart(data, armor) {
+            const ctx = document.getElementById('ttkChart').getContext('2d');
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.Name),
+                    datasets: [
+                        {
+                            label: `Head TTK (${armor})`,
+                            data: data.map(d => d[`Head_TTK_${armor}`]),
+                            backgroundColor: '#38bdf8'
+                        },
+                        {
+                            label: `Body TTK (${armor})`,
+                            data: data.map(d => d[`Body_TTK_${armor}`]),
+                            backgroundColor: '#94a3b8'
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: { x: { title: { display: true, text: 'Seconds to Kill' } } }
+                }
+            });
+        }
+
+        function renderTable(data) {
+            const tbody = document.querySelector('#statTable tbody');
+            tbody.innerHTML = '';
+            data.forEach(d => {
+                const row = `<tr>
+                    <td>${d.Name}</td>
+                    <td>${d.DPS || '-'}</td>
+                    <td>${d.Mag_Size || '-'}</td>
+                    <td>${d.Reload_Time || '-'}s</td>
+                    <td>${d.Range || '-'}m</td>
+                    <td>${d.Stability || '-'}</td>
+                    <td>${d.Weight || '-'}</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+    </script>
+</body>
+</html>
