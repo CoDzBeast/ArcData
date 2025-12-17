@@ -91,6 +91,7 @@
           <option value="Body" selected>Body Shot</option>
           <option value="Head">Headshot</option>
           <option value="Leg">Leg Shot</option>
+          <option value="Overall">Overall (Weighted)</option>
         </select>
       </div>
 
@@ -130,6 +131,9 @@
           <canvas id="mainChart" height="110"></canvas>
           <div class="note">
             Score is a normalized weighted composite (0–100) over the currently filtered set. For category fairness, Range is normalized within category.
+          </div>
+          <div class="note">
+            Overall (Weighted) uses Head/Body/Leg weights: <b>20% / 70% / 10%</b>. Adjust in <code>OVERALL_HIT_WEIGHTS</code>.
           </div>
         </div>
 
@@ -233,6 +237,9 @@
     let rawData = [], chart;
     let lastSort = { key: "Score", dir: "desc" };
 
+    // Weighted hit distribution for Overall (must sum to 1.0)
+    const OVERALL_HIT_WEIGHTS = { Head: 0.20, Body: 0.70, Leg: 0.10 };
+
     // Relative path for GitHub Pages
     const csvFile = "arc_raiders_final.csv";
 
@@ -290,7 +297,6 @@
     }
 
     function onWeightChange() {
-      // if user touches sliders, switch to CUSTOM
       const mode = document.getElementById("scoreMode");
       if (mode.value !== "CUSTOM") mode.value = "CUSTOM";
       syncWeightOutputs();
@@ -311,8 +317,6 @@
 
     function applyPresetWeights(force=false) {
       const mode = document.getElementById("scoreMode").value;
-
-      // Only auto-apply when in presets, or forced reset.
       if (!force && mode === "CUSTOM") return;
 
       const presets = {
@@ -355,22 +359,54 @@
       return 1 - x;
     }
 
-    // Approx sustained DPS:
-    // - infer shots/sec from STK+TTK: sps ≈ (STK - 1) / TTK
-    // - estimate time to empty mag: (Mag - 1) / sps
-    // - during firing, DPS is "DPS"
-    // - damage_per_mag ≈ DPS * time_firing
-    // - sustained ≈ damage_per_mag / (time_firing + reload)
-    function sustainedDpsApprox(d, ttkKey, stkKey) {
+    function weightedAverage(parts) {
+      let wSum = 0, vSum = 0;
+      for (const [w, v] of parts) {
+        if (typeof v !== "number" || !isFinite(v)) continue;
+        wSum += w;
+        vSum += w * v;
+      }
+      return wSum > 0 ? (vSum / wSum) : null;
+    }
+
+    function getZoneTTK(d, zone, armor) {
+      if (zone !== "Overall") return safeNum(d[`${zone} TTK ${armor}`]);
+
+      const h = safeNum(d[`Head TTK ${armor}`]);
+      const b = safeNum(d[`Body TTK ${armor}`]);
+      const l = safeNum(d[`Leg TTK ${armor}`]);
+
+      return weightedAverage([
+        [OVERALL_HIT_WEIGHTS.Head, h],
+        [OVERALL_HIT_WEIGHTS.Body, b],
+        [OVERALL_HIT_WEIGHTS.Leg,  l]
+      ]);
+    }
+
+    function getZoneSTK(d, zone, armor) {
+      if (zone !== "Overall") return safeNum(d[`${zone} STK ${armor}`]);
+
+      const h = safeNum(d[`Head STK ${armor}`]);
+      const b = safeNum(d[`Body STK ${armor}`]);
+      const l = safeNum(d[`Leg STK ${armor}`]);
+
+      return weightedAverage([
+        [OVERALL_HIT_WEIGHTS.Head, h],
+        [OVERALL_HIT_WEIGHTS.Body, b],
+        [OVERALL_HIT_WEIGHTS.Leg,  l]
+      ]);
+    }
+
+    // Approx sustained DPS (supports Overall by passing computed ttk/stk via fallback branch)
+    function sustainedDpsApprox(d, ttkKey, stkKey, overrideTTK=null, overrideSTK=null) {
       const DPS = safeNum(d.DPS);
-      const ttk = safeNum(d[ttkKey]);
-      const stk = safeNum(d[stkKey]);
+      const ttk = (overrideTTK !== null) ? overrideTTK : safeNum(d[ttkKey]);
+      const stk = (overrideSTK !== null) ? overrideSTK : safeNum(d[stkKey]);
       const mag = safeNum(d.Mag);
       const reload = safeNum(d.Reload);
 
       if (!DPS || !reload || !mag) return null;
       if (!ttk || !stk || stk <= 1) {
-        // fallback: assume 10 shots/sec for time-to-empty approximation
         const spsFallback = 10;
         const timeFiring = (mag - 1) / spsFallback;
         if (!isFinite(timeFiring) || timeFiring <= 0) return null;
@@ -396,6 +432,15 @@
     }
 
     function armorConsistency(d, zone) {
+      // For Overall: use Overall computed TTK0/TTKH
+      if (zone === "Overall") {
+        const ttk0 = getZoneTTK(d, "Overall", "0");
+        const ttkH = getZoneTTK(d, "Overall", "H");
+        if (!ttk0 || !ttkH) return null;
+        const cons = 1 - ((ttkH - ttk0) / ttk0);
+        return clamp(cons, 0, 1);
+      }
+
       const ttk0 = safeNum(d[`${zone} TTK 0`]);
       const ttkH = safeNum(d[`${zone} TTK H`]);
       if (!ttk0 || !ttkH) return null;
@@ -404,6 +449,17 @@
     }
 
     function ttkVolatility(d, zone) {
+      // For Overall: use Overall computed across armor types
+      if (zone === "Overall") {
+        const arr = [
+          getZoneTTK(d, "Overall", "0"),
+          getZoneTTK(d, "Overall", "L"),
+          getZoneTTK(d, "Overall", "M"),
+          getZoneTTK(d, "Overall", "H"),
+        ];
+        return stddev(arr);
+      }
+
       const arr = [
         safeNum(d[`${zone} TTK 0`]),
         safeNum(d[`${zone} TTK L`]),
@@ -437,7 +493,7 @@
       const search = document.getElementById('searchInput').value.toLowerCase();
       const chartMetric = document.getElementById("chartMetric").value;
 
-      // keys for current scenario
+      // keys for non-Overall scenario (used for full-dataset normalization later)
       const ttkKey = `${zone} TTK ${armor}`;
       const stkKey = `${zone} STK ${armor}`;
 
@@ -457,19 +513,24 @@
         maxRangeByCat[c] = Math.max(maxRangeByCat[c] || 0, r);
       });
 
-      // Compute raw derived metrics for filtered list
+      // Compute derived metrics for filtered list
       const computed = filtered.map(d => {
-        const ttk = safeNum(d[ttkKey]);
-        const reload = safeNum(d.Reload);
-        const range = safeNum(d.Range);
         const category = d.Category || "Unknown";
+        const range = safeNum(d.Range);
+        const rangeScore = (range && maxRangeByCat[category]) ? (range / maxRangeByCat[category]) : null;
 
-        const sustain = sustainedDpsApprox(d, ttkKey, stkKey);
+        const ttk = getZoneTTK(d, zone, armor);
+        const stk = getZoneSTK(d, zone, armor);
+        const reload = safeNum(d.Reload);
+
+        // sustained uses override ttk/stk for Overall
+        const sustain = (zone === "Overall")
+          ? sustainedDpsApprox(d, null, null, ttk, stk)
+          : sustainedDpsApprox(d, ttkKey, stkKey);
+
         const handling = handlingIndex(d);
         const armorCons = armorConsistency(d, zone);
         const vol = ttkVolatility(d, zone);
-
-        const rangeScore = (range && maxRangeByCat[category]) ? (range / maxRangeByCat[category]) : null;
         const reloadTax = (reload && ttk) ? (reload / (reload + ttk)) : null;
 
         return {
@@ -478,6 +539,7 @@
           Category: category,
 
           TTK: ttk,
+          STK: stk,
           DPS: safeNum(d.DPS),
           Reload: reload,
           Range: range,
@@ -500,7 +562,6 @@
 
       // Score each row (0..1), then 0..100
       computed.forEach(x => {
-        // Normalize each component
         const nTTK = invert01(normalize(x.TTK, ranges.TTK.min, ranges.TTK.max));
         const nSustain = normalize(x.Sustain, ranges.Sustain.min, ranges.Sustain.max);
         const nHandling = normalize(x.Handling, ranges.Handling.min, ranges.Handling.max);
@@ -508,7 +569,6 @@
         const nReload = invert01(normalize(x.Reload, ranges.Reload.min, ranges.Reload.max));
         const nArmor = normalize(x.ArmorCons, ranges.ArmorCons.min, ranges.ArmorCons.max);
 
-        // Handle missing values: treat as 0.0 contribution (conservative)
         const cTTK = nTTK ?? 0;
         const cSustain = nSustain ?? 0;
         const cHandling = nHandling ?? 0;
@@ -525,21 +585,17 @@
           (cArmor * w.armor);
 
         x.Score01 = clamp(score01, 0, 1);
-        x.Score = Math.round(x.Score01 * 1000) / 10; // one decimal (0..100)
+        x.Score = Math.round(x.Score01 * 1000) / 10;
         x._components = { nTTK, nSustain, nHandling, nRange, nReload, nArmor };
       });
 
-      // sort
       computed.sort((a, b) => compareRows(a, b, lastSort));
 
-      // status
       setStatus(`${computed.length} weapons • sort: ${lastSort.key} (${lastSort.dir})`);
 
-      // render
-      renderChart(computed, chartMetric, ttkKey);
-      renderTable(computed, ttkKey, stkKey);
+      renderChart(computed, chartMetric);
+      renderTable(computed);
 
-      // update chart title
       const title = (chartMetric === "SCORE")
         ? `Performance Landscape (Score 0–100)`
         : `Performance Landscape (${zone} TTK vs Armor ${armor} — seconds)`;
@@ -565,7 +621,6 @@
 
       if (key === "Name") return (String(av).localeCompare(String(bv))) * dir;
 
-      // nulls always sink to bottom
       if (av === null && bv === null) return 0;
       if (av === null) return 1;
       if (bv === null) return -1;
@@ -589,7 +644,7 @@
       }
     }
 
-    function renderChart(list, metric, ttkKey) {
+    function renderChart(list, metric) {
       const ctx = document.getElementById('mainChart').getContext('2d');
       const chartData = list.slice(0, 15);
 
@@ -629,7 +684,7 @@
       });
     }
 
-    function renderTable(list, ttkKey, stkKey) {
+    function renderTable(list) {
       const tbody = document.querySelector('#weaponTable tbody');
 
       tbody.innerHTML = list.map(d => {
@@ -642,7 +697,6 @@
         const armTxt = (typeof d.ArmorCons === "number") ? Math.round(d.ArmorCons * 100) + "%" : "-";
         const volTxt = (typeof d.Vol === "number") ? d.Vol.toFixed(2) : "-";
 
-        // safer quoting
         const safeName = (d.Name || "").replace(/'/g, "\\'");
 
         return `
@@ -665,17 +719,13 @@
       const armor = document.getElementById('armor').value;
       const zone = document.getElementById('zone').value;
 
-      const ttkKey = `${zone} TTK ${armor}`;
-      const stkKey = `${zone} STK ${armor}`;
-
       const d = rawData.find(w => w.Name === name);
       if (!d) return;
 
-      // Recompute the same computed row for details, using current filters/weights normalization would differ,
-      // so we compute a "local" breakdown just for display (normalized against all weapons in dataset).
       const category = d.Category || "Unknown";
-      const ttk = safeNum(d[ttkKey]);
-      const stk = safeNum(d[stkKey]);
+
+      const ttk = getZoneTTK(d, zone, armor);
+      const stk = getZoneSTK(d, zone, armor);
       const reload = safeNum(d.Reload);
       const range = safeNum(d.Range);
       const DPS = safeNum(d.DPS);
@@ -683,20 +733,37 @@
       const handling = handlingIndex(d);
       const armorCons = armorConsistency(d, zone);
       const vol = ttkVolatility(d, zone);
-      const sustain = sustainedDpsApprox(d, ttkKey, stkKey);
+
+      // sustained: override for Overall
+      const ttkKey = `${zone} TTK ${armor}`;
+      const stkKey = `${zone} STK ${armor}`;
+      const sustain = (zone === "Overall")
+        ? sustainedDpsApprox(d, null, null, ttk, stk)
+        : sustainedDpsApprox(d, ttkKey, stkKey);
 
       // category max range
-      const maxRange = Math.max(...rawData.filter(x => (x.Category||"Unknown")===category).map(x => safeNum(x.Range) || 0));
+      const maxRange = Math.max(...rawData
+        .filter(x => (x.Category||"Unknown")===category)
+        .map(x => safeNum(x.Range) || 0)
+      );
       const rangeScore = (range && maxRange) ? (range / maxRange) : null;
 
       // Normalization for breakdown against whole dataset (stable view)
       const whole = rawData.map(w => {
         const c = w.Category || "Unknown";
         const maxR = Math.max(...rawData.filter(x => (x.Category||"Unknown")===c).map(x => safeNum(x.Range) || 0));
+
+        const wTTK = (zone === "Overall") ? getZoneTTK(w, "Overall", armor) : safeNum(w[ttkKey]);
+        const wSTK = (zone === "Overall") ? getZoneSTK(w, "Overall", armor) : safeNum(w[stkKey]);
+
+        const wSustain = (zone === "Overall")
+          ? sustainedDpsApprox(w, null, null, wTTK, wSTK)
+          : sustainedDpsApprox(w, ttkKey, stkKey);
+
         return {
-          TTK: safeNum(w[ttkKey]),
+          TTK: wTTK,
           Reload: safeNum(w.Reload),
-          Sustain: sustainedDpsApprox(w, ttkKey, stkKey),
+          Sustain: wSustain,
           Handling: handlingIndex(w),
           ArmorCons: armorConsistency(w, zone),
           RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null
@@ -707,7 +774,7 @@
         TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ArmorCons: x.ArmorCons
       })));
 
-      const w = getWeights01();
+      const wts = getWeights01();
 
       const nTTK = invert01(normalize(ttk, ranges.TTK.min, ranges.TTK.max));
       const nSustain = normalize(sustain, ranges.Sustain.min, ranges.Sustain.max);
@@ -717,12 +784,12 @@
       const nArmor = normalize(armorCons, ranges.ArmorCons.min, ranges.ArmorCons.max);
 
       const score01 =
-        ((nTTK ?? 0) * w.ttk) +
-        ((nSustain ?? 0) * w.sustain) +
-        ((nHandling ?? 0) * w.handling) +
-        ((nRange ?? 0) * w.range) +
-        ((nReload ?? 0) * w.reload) +
-        ((nArmor ?? 0) * w.armor);
+        ((nTTK ?? 0) * wts.ttk) +
+        ((nSustain ?? 0) * wts.sustain) +
+        ((nHandling ?? 0) * wts.handling) +
+        ((nRange ?? 0) * wts.range) +
+        ((nReload ?? 0) * wts.reload) +
+        ((nArmor ?? 0) * wts.armor);
 
       const score = Math.round(clamp(score01,0,1) * 1000) / 10;
 
@@ -732,16 +799,15 @@
       const firingMode = d['Firing Mode'] || 'N/A';
       const armorPen = d['Armor Pen'] || 'N/A';
       const crit = d['Crit Multi'] || '1.0';
-
       const sell = d.Sell ? `$${Number(d.Sell).toLocaleString()}` : '$0';
 
       const bars = [
-        ["TTK", nTTK, w.ttk],
-        ["Sustain", nSustain, w.sustain],
-        ["Handling", nHandling, w.handling],
-        ["Range", nRange, w.range],
-        ["Reload", nReload, w.reload],
-        ["Armor", nArmor, w.armor],
+        ["TTK", nTTK, wts.ttk],
+        ["Sustain", nSustain, wts.sustain],
+        ["Handling", nHandling, wts.handling],
+        ["Range", nRange, wts.range],
+        ["Reload", nReload, wts.reload],
+        ["Armor", nArmor, wts.armor],
       ];
 
       document.getElementById('dStats').innerHTML = `
@@ -791,7 +857,6 @@
         </div>
       `;
 
-      // Scroll detail panel into view on mobile
       if (window.innerWidth < 1100) {
         document.getElementById('detailPanel').scrollIntoView({ behavior: 'smooth' });
       }
