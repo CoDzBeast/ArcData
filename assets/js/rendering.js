@@ -50,6 +50,10 @@ export function renderTable(list, onRowClick) {
     const mobilityCostTxt = (typeof d.MobilityCost === "number") ? d.MobilityCost.toFixed(2) + "s" : "-";
     const mobilityCostNormTxt = (typeof d.MobilityCostNorm === "number") ? Math.round(d.MobilityCostNorm * 100) / 100 : "-";
     const scoreTxt = (typeof d.Score === "number") ? d.Score.toFixed(1) : "-";
+    const dominanceTxt = (typeof d.RoleDominanceIndex === "number") ? `${d.RoleDominanceIndex.toFixed(1)}%` : "-";
+    const dominanceCell = d.RoleDominanceTop10
+      ? `${dominanceTxt}<div class="subtle">Top 10% role</div>`
+      : dominanceTxt;
     const dpsTxt = d.DPS ? d.DPS : "-";
     const dpcRawTxt = (typeof d.DamagePerCycle === "number") ? Math.round(d.DamagePerCycle) : "-";
     const dpcNormTxt = (typeof d.DamagePerCycleNorm === "number") ? Math.round(d.DamagePerCycleNorm * 100) / 100 : "-";
@@ -86,6 +90,7 @@ export function renderTable(list, onRowClick) {
       <tr data-name="${escapeHtml(d.Name || '')}">
         <td class="stat-val">${d.Name}</td>
         <td class="highlight">${scoreTxt}</td>
+        <td>${dominanceCell}</td>
         <td>${ttkTxt}</td>
         <td>${exposureTxt}${exposureNormTxt !== "-" ? `<div class="subtle">${exposureNormTxt} norm</div>` : ""}</td>
         <td>${mobilityCostTxt}${mobilityCostNormTxt !== "-" ? `<div class="subtle">${mobilityCostNormTxt} norm</div>` : ""}</td>

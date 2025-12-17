@@ -7,6 +7,7 @@ import { safeNum, escapeHtml, normalize, invert01 } from './utils.js';
 
 let rawData = [], chart;
 let lastSort = { key: "Score", dir: "desc" };
+let roleDominanceByName = {};
 
 init();
 
@@ -218,6 +219,15 @@ function updateUI() {
     };
   });
 
+  applyRoleDominance(scored);
+  roleDominanceByName = scored.reduce((acc, weapon) => {
+    acc[weapon.Name] = {
+      index: weapon.RoleDominanceIndex,
+      top: weapon.RoleDominanceTop10
+    };
+    return acc;
+  }, {});
+
   scored.sort((a, b) => compareRows(a, b, lastSort));
 
   setStatus(`Showing ${scored.length} of ${rawData.length}`);
@@ -322,6 +332,10 @@ function showDetails(name) {
   const armorPenNorm = (typeof armorPen.deltaRatio === "number" && armorPenRange)
     ? invert01(normalize(armorPen.deltaRatio, armorPenRange.min, armorPenRange.max))
     : null;
+
+  const dominance = roleDominanceByName[d.Name] || {};
+  const dominanceTxt = (typeof dominance.index === "number") ? `${dominance.index.toFixed(1)}%` : "-";
+  const dominanceBadge = dominance.top ? "🏆 Top 10%" : "";
 
   const whole = rawData.map(w => {
     const c = w.Category || "Unknown";
@@ -438,6 +452,7 @@ function showDetails(name) {
     <div style="margin-top:14px;">
       <div class="grid2">
         <div class="kv"><b>Score</b><span class="highlight">${isFinite(score) ? score.toFixed(1) : "-"}</span></div>
+        <div class="kv"><b>Role Dominance</b><span>${dominanceTxt}${dominanceBadge ? ` <span class="subtle">(${dominanceBadge})</span>` : ""}</span></div>
         <div class="kv"><b>${zone} TTK vs ${armor}</b><span>${ttk ? ttk.toFixed(2)+"s" : "-"}</span></div>
         <div class="kv"><b>Exposure Time</b><span>${exposureTxt}</span></div>
         <div class="kv"><b>Exposure (Norm)</b><span>${exposureNormTxt}</span></div>
@@ -521,4 +536,32 @@ function updateChartTitle(zone, armor, metric) {
     ? `Performance Landscape (Score 0–100)`
     : `Performance Landscape (${zone} TTK vs Armor ${armor} — seconds)`;
   document.getElementById("chartTitle").textContent = title;
+}
+
+function applyRoleDominance(list) {
+  const byCategory = {};
+  list.forEach((item) => {
+    const cat = item.Category || "Unknown";
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(item);
+  });
+
+  Object.values(byCategory).forEach((arr) => {
+    arr.sort((a, b) => (b.Score01 ?? -Infinity) - (a.Score01 ?? -Infinity));
+    const len = arr.length;
+
+    arr.forEach((item, idx) => {
+      if (len === 1) {
+        item.RoleDominanceIndex = 100;
+        item.RoleDominanceTop10 = true;
+        return;
+      }
+
+      const pct = (1 - (idx / Math.max(len - 1, 1))) * 100;
+      item.RoleDominanceIndex = Math.round(pct * 10) / 10;
+      item.RoleDominanceTop10 = idx < Math.max(1, Math.ceil(len * 0.1));
+    });
+  });
+
+  return list;
 }

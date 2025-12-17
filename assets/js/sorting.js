@@ -30,6 +30,7 @@ function getSortValue(row, key) {
   switch(key) {
     case "Name": return row.Name || "";
     case "Score": return row.Score01 ?? null;
+    case "RoleDom": return row.RoleDominanceIndex ?? null;
     case "TTK": return row.TTK ?? null;
     case "DPS": return row.DPS ?? null;
     case "DamagePerCycle": return row.DamagePerCycle ?? null;
