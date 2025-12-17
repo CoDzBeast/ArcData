@@ -57,3 +57,4 @@ hr { border: 0; border-top: 1px solid #334155; margin: 16px 0; }
 .warn { color:#fbbf24; font-size:0.85rem; }
 .warn-pill { display:inline-flex; align-items:center; gap:6px; padding:2px 9px; border-radius:999px; border:1px solid #fbbf24; background:rgba(251,191,36,0.1); color:#fbbf24; font-size:0.75rem; letter-spacing:0.04em; text-transform:uppercase; }
 .warn-pill.sm { font-size:0.7rem; padding:2px 7px; }
+.explanation { border:1px solid #334155; background:#0b1222; border-left:3px solid var(--neon-blue); padding:12px; border-radius:12px; font-weight:600; color:#e2e8f0; margin-bottom:12px; }
