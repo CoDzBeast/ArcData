@@ -41,30 +41,24 @@ export function getZoneSTK(d, zone, armor) {
   ]);
 }
 
-// Approx sustained DPS (supports Overall by passing computed ttk/stk via fallback branch)
+// Sustained DPS using inferred fire rate from STK/TTK and magazine reload cycle
 export function sustainedDpsApprox(d, ttkKey, stkKey, overrideTTK=null, overrideSTK=null) {
-  const DPS = safeNum(d.DPS);
-  const ttk = (overrideTTK !== null) ? overrideTTK : safeNum(d[ttkKey]);
-  const stk = (overrideSTK !== null) ? overrideSTK : safeNum(d[stkKey]);
+  const dmgPerShot = safeNum(d.DMG);
   const mag = safeNum(d.Mag);
   const reload = safeNum(d.Reload);
+  const ttk = (overrideTTK !== null) ? overrideTTK : safeNum(d[ttkKey]);
+  const stk = (overrideSTK !== null) ? overrideSTK : safeNum(d[stkKey]);
 
-  if (!DPS || !reload || !mag) return null;
-  if (!ttk || !stk || stk <= 1) {
-    const spsFallback = 10;
-    const timeFiring = (mag - 1) / spsFallback;
-    if (!isFinite(timeFiring) || timeFiring <= 0) return null;
-    const dmgMag = DPS * timeFiring;
-    return dmgMag / (timeFiring + reload);
-  }
+  if (!dmgPerShot || !mag || mag <= 0 || !reload || reload < 0) return null;
+  if (!ttk || ttk <= 0 || !stk || stk <= 1) return null;
 
-  const sps = (stk - 1) / ttk;
-  if (!isFinite(sps) || sps <= 0) return null;
+  const shotsPerSec = (stk - 1) / ttk;
+  if (!isFinite(shotsPerSec) || shotsPerSec <= 0) return null;
 
-  const timeFiring = (mag - 1) / sps;
-  if (!isFinite(timeFiring) || timeFiring <= 0) return null;
+  const timeFiring = (mag - 1) / shotsPerSec;
+  if (!isFinite(timeFiring) || timeFiring < 0) return null;
 
-  const dmgMag = DPS * timeFiring;
+  const dmgMag = mag * dmgPerShot;
   return dmgMag / (timeFiring + reload);
 }
 
