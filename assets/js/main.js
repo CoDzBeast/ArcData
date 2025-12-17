@@ -109,12 +109,20 @@ function updateUI() {
       rangeScore: d.RangeScore,
       reload: d.Reload,
       armorCons: d.ArmorCons,
-      armorBreakAvg: d.ArmorBreakAvg
+      armorBreakAvg: d.ArmorBreakAvg,
+      volatility: d.Vol
     }, ranges);
 
     const { score, score01 } = computeScore(normalized);
 
-    return { ...d, ...normalized, ArmorBreakpointScore: normalized.nArmorBreak, Score: score, Score01: score01 };
+    return {
+      ...d,
+      ...normalized,
+      ConsistencyScore: normalized.nConsistency,
+      ArmorBreakpointScore: normalized.nArmorBreak,
+      Score: score,
+      Score01: score01
+    };
   });
 
   scored.sort((a, b) => compareRows(a, b, lastSort));
@@ -182,12 +190,13 @@ function showDetails(name) {
       Handling: handlingIndex(w),
       ArmorCons: armorConsistency(w, zone),
       ArmorBreakAvg: armorBreakpoint(w).avgDelta,
-      RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null
+      RangeScore: (safeNum(w.Range) && maxR) ? (safeNum(w.Range)/maxR) : null,
+      Vol: ttkVolatility(w, zone)
     };
   });
 
   const ranges = buildRanges(whole.map(x => ({
-    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg
+    TTK: x.TTK, Sustain: x.Sustain, Handling: x.Handling, RangeScore: x.RangeScore, Reload: x.Reload, ArmorCons: x.ArmorCons, ArmorBreakAvg: x.ArmorBreakAvg, Vol: x.Vol
   })));
 
   const normalized = normalizeMetrics({
@@ -197,7 +206,8 @@ function showDetails(name) {
     rangeScore,
     reload,
     armorCons,
-    armorBreakAvg: armorBreak.avgDelta
+    armorBreakAvg: armorBreak.avgDelta,
+    volatility: vol
   }, ranges);
 
   const { score } = computeScore(normalized);
@@ -235,6 +245,7 @@ function showDetails(name) {
         <div class="kv"><b>Range</b><span>${range ? range+"m" : "-"}</span></div>
         <div class="kv"><b>Armor Consistency</b><span>${typeof armorCons==="number" ? Math.round(armorCons*100)+"%" : "-"}</span></div>
         <div class="kv"><b>Armor BP Score</b><span>${typeof normalized.nArmorBreak==="number" ? Math.round(normalized.nArmorBreak*100)/100 : "-"}</span></div>
+        <div class="kv"><b>Consistency Score</b><span>${typeof normalized.nConsistency==="number" ? Math.round(normalized.nConsistency*100)/100 : "-"}</span></div>
         <div class="kv"><b>TTK Volatility</b><span>${typeof vol==="number" ? vol.toFixed(2) : "-"}</span></div>
         <div class="kv"><b>Headshot Dependency</b><span>${typeof headDep==="number" ? headDep.toFixed(2) : "-"}${headDepHigh ? " 🔺" : ""}</span></div>
         <div class="kv"><b>Normalized Dependency</b><span>${typeof headDepNorm==="number" ? Math.round(headDepNorm*100)/100 : "-"}</span></div>

@@ -143,7 +143,7 @@ export function headshotDependencyStats(list, armor) {
 }
 
 export function buildRanges(list) {
-  const keys = ["TTK","Sustain","Handling","RangeScore","Reload","ArmorCons","ArmorBreakAvg"];
+  const keys = ["TTK","Sustain","Handling","RangeScore","Reload","ArmorCons","ArmorBreakAvg","Vol"];
   const r = {};
   keys.forEach(k => {
     const vals = list.map(x => x[k]).filter(v => typeof v === "number" && isFinite(v));
@@ -160,6 +160,7 @@ export function normalizeMetrics(values, ranges) {
     nRange: normalize(values.rangeScore, ranges.RangeScore.min, ranges.RangeScore.max),
     nReload: invert01(normalize(values.reload, ranges.Reload.min, ranges.Reload.max)),
     nArmor: normalize(values.armorCons, ranges.ArmorCons.min, ranges.ArmorCons.max),
-    nArmorBreak: invert01(normalize(values.armorBreakAvg, ranges.ArmorBreakAvg.min, ranges.ArmorBreakAvg.max))
+    nArmorBreak: invert01(normalize(values.armorBreakAvg, ranges.ArmorBreakAvg.min, ranges.ArmorBreakAvg.max)),
+    nConsistency: invert01(normalize(values.volatility, ranges.Vol.min, ranges.Vol.max))
   };
 }
