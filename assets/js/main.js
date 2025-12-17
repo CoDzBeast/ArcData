@@ -2,7 +2,7 @@ import { loadWeaponData } from './dataLoader.js';
 import { setStatus, initSelectors, bindSortHeaders, bindAccordion, bindControls, applyPresetWeights, syncWeightOutputs, getControlState } from './controls.js';
 import { renderChart, renderTable, renderDetailPanel } from './rendering.js';
 import { compareRows, updateSortState, computeScore } from './sorting.js';
-import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax } from './metrics.js';
+import { getZoneTTK, getZoneSTK, sustainedDpsApprox, handlingIndex, armorConsistency, ttkVolatility, armorBreakpoint, buildRanges, normalizeMetrics, headshotDependency, headshotDependencyStats, reloadTax, damagePerCycle } from './metrics.js';
 import { safeNum, escapeHtml, normalize } from './utils.js';
 
 let rawData = [], chart;
@@ -50,17 +50,29 @@ function updateUI() {
   });
 
   const maxRangeByCat = {};
+  const maxDmgCycleByCat = {};
   rawData.forEach(d => {
     const c = d.Category || "Unknown";
+
     const r = safeNum(d.Range);
-    if (!r) return;
-    maxRangeByCat[c] = Math.max(maxRangeByCat[c] || 0, r);
+    if (r) {
+      maxRangeByCat[c] = Math.max(maxRangeByCat[c] || 0, r);
+    }
+
+    const dpc = damagePerCycle(d);
+    if (typeof dpc === "number" && isFinite(dpc)) {
+      maxDmgCycleByCat[c] = Math.max(maxDmgCycleByCat[c] || 0, dpc);
+    }
   });
 
   const computed = filtered.map(d => {
     const category = d.Category || "Unknown";
     const range = safeNum(d.Range);
     const rangeScore = (range && maxRangeByCat[category]) ? (range / maxRangeByCat[category]) : null;
+    const dmgPerCycle = damagePerCycle(d);
+    const dmgPerCycleNorm = (typeof dmgPerCycle === "number" && maxDmgCycleByCat[category])
+      ? dmgPerCycle / maxDmgCycleByCat[category]
+      : null;
 
     const ttk = getZoneTTK(d, zone, armor);
     const stk = getZoneSTK(d, zone, armor);
@@ -101,6 +113,8 @@ function updateUI() {
       Handling: handling,
       ArmorCons: armorCons,
       Vol: vol,
+      DamagePerCycle: dmgPerCycle,
+      DamagePerCycleNorm: dmgPerCycleNorm,
       HeadDep: headDep,
       HeadDepNorm: headDepNorm,
       HeadDepHigh: headDepHigh,
@@ -161,6 +175,7 @@ function showDetails(name) {
   const mag = safeNum(d.Mag);
   const range = safeNum(d.Range);
   const DPS = safeNum(d.DPS);
+  const dmgPerCycle = damagePerCycle(d);
   const reloadTaxVal = reloadTax(reload, ttk);
 
   const engagementsPerMag = (typeof mag === "number" && mag > 0 && typeof stk === "number" && stk > 0)
@@ -189,6 +204,14 @@ function showDetails(name) {
     .map(x => safeNum(x.Range) || 0)
   );
   const rangeScore = (range && maxRange) ? (range / maxRange) : null;
+  const dmgCycleValues = rawData
+    .filter(x => (x.Category || "Unknown") === category)
+    .map(x => damagePerCycle(x))
+    .filter(v => typeof v === "number" && isFinite(v));
+  const maxDmgCycle = dmgCycleValues.length ? Math.max(...dmgCycleValues) : null;
+  const dmgPerCycleNorm = (typeof dmgPerCycle === "number" && typeof maxDmgCycle === "number" && maxDmgCycle > 0)
+    ? dmgPerCycle / maxDmgCycle
+    : null;
 
   const whole = rawData.map(w => {
     const c = w.Category || "Unknown";
@@ -251,6 +274,7 @@ function showDetails(name) {
     ["Sustain", normalized.nSustain],
     ["Handling", normalized.nHandling],
     ["Range", normalized.nRange],
+    ["Damage/Cycle (Cat)", dmgPerCycleNorm],
     ["Reload Penalty", normalized.nReloadPenalty],
     ["Armor", normalized.nArmor],
     ["Armor BP", normalized.nArmorBreak],
@@ -263,6 +287,8 @@ function showDetails(name) {
         <div class="kv"><b>${zone} TTK vs ${armor}</b><span>${ttk ? ttk.toFixed(2)+"s" : "-"}</span></div>
         <div class="kv"><b>DPS</b><span>${DPS ?? "-"}</span></div>
         <div class="kv"><b>Sustained DPS</b><span>${typeof sustain==="number" ? sustain.toFixed(1) : "-"}</span></div>
+        <div class="kv"><b>Damage / Cycle</b><span>${typeof dmgPerCycle==="number" ? Math.round(dmgPerCycle) : "-"}</span></div>
+        <div class="kv"><b>Norm D/C (Cat)</b><span>${typeof dmgPerCycleNorm==="number" ? Math.round(dmgPerCycleNorm*100)/100 : "-"}</span></div>
         <div class="kv"><b>Reload</b><span>${reload ? reload.toFixed(2)+"s" : "-"}</span></div>
         <div class="kv"><b>Engagements/Mag</b><span>${typeof engagementsPerMag==="number" ? engagementsPerMag : "-"}</span></div>
         <div class="kv"><b>Reload Each Kill?</b><span>${reloadEveryKill === null ? "-" : (reloadEveryKill ? "Yes" : "No")}</span></div>

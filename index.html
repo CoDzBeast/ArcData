@@ -93,6 +93,7 @@
                   <th class="sortable" data-sort="Score">Score</th>
                   <th class="sortable" data-sort="TTK">TTK</th>
                   <th class="sortable" data-sort="DPS">DPS</th>
+                  <th class="sortable" data-sort="DamagePerCycle">Dmg/Cycle</th>
                   <th class="sortable" data-sort="Sustain">Sustain</th>
                   <th class="sortable" data-sort="Engage">Eng/Mag</th>
                   <th class="sortable" data-sort="Reload">Reload</th>
@@ -110,7 +111,7 @@
           <div class="note">
             Armor = consistency vs armor scaling. Head Dep = Body/Head TTK ratio (normalized in cell, 🔺 = above dataset 75th percentile).
             Armor BP = normalized armor breakpoint score (Body TTK deltas, higher is better). Consistency = normalized inverse volatility (0–1; higher is steadier). Vol = TTK volatility across 0/L/M/H (lower is better).
-            Eng/Mag = floor(Mag ÷ STK). ⚠️ flag indicates weapons that must reload after every kill.
+            Eng/Mag = floor(Mag ÷ STK). ⚠️ flag indicates weapons that must reload after every kill. Dmg/Cycle = Mag × Damage per shot with category-normalized value in the cell.
           </div>
         </div>
       </div>
