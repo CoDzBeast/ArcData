@@ -170,6 +170,16 @@ export function headshotDependencyStats(list, armor) {
   };
 }
 
+export function critLeverage(d, armor) {
+  const body = safeNum(d[`Body TTK ${armor}`]);
+  const head = safeNum(d[`Head TTK ${armor}`]);
+  const crit = safeNum(d[`Crit Multi`]);
+
+  if (!body || !head || !crit) return null;
+
+  return (body - head) * crit;
+}
+
 export function buildRanges(list) {
   const keys = [
     "TTK",

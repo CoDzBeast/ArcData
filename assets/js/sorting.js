@@ -39,6 +39,7 @@ function getSortValue(row, key) {
     case "Handling": return row.HandlingIndexNorm ?? row.Handling ?? null;
     case "Range": return row.Range ?? null;
     case "HeadDep": return row.HeadDep ?? null;
+    case "CritLeverage": return row.CritLeverageNorm ?? row.CritLeverage ?? null;
     case "ArmorCons":
     case "Armor": return row.ArmorCons ?? null;
     case "ArmorPen": return row.ArmorPenScore ?? null;
