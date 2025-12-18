@@ -16,6 +16,8 @@ import {
   armorPenEffectiveness,
   getZoneTTK,
   getZoneSTK,
+  detectWeightColumn,
+  analyzeMissingMetrics,
 } from './metrics.js';
 import { safeNum, stddev } from './utils.js';
 
@@ -40,6 +42,8 @@ function init() {
   loadWeaponData()
     .then((data) => {
       rawData = data;
+      console.log('CSV schema keys:', Object.keys(rawData[0] || {}));
+      detectWeightColumn(rawData);
       initSelectors(rawData);
       updateUI();
     })
@@ -69,6 +73,10 @@ function updateUI() {
   const stats = computeStats(rawList.map((r) => r.raw));
 
   computedRows = rawList.map(({ source, raw }) => buildComputedRow(source, raw, stats, ctx));
+  const missingAnalysis = analyzeMissingMetrics(computedRows.map((r) => ({ normalized: r.normalized })));
+  if (missingAnalysis.suppressed.size) {
+    computedRows = rawList.map(({ source, raw }) => buildComputedRow(source, raw, stats, ctx, missingAnalysis.suppressed));
+  }
 
   applyRoleDominance(computedRows);
   applyCounterRank(computedRows);
@@ -104,6 +112,7 @@ function updateUI() {
     scoredWithOutliers.map((r) => ({ normalized: r.normalized })),
     stats,
     getWeights01(),
+    missingAnalysis,
   );
   setStatus(`${validation.okText} | ${validation.missingText}`);
   updateChartTitle(zone, armor, chartMetric);
@@ -112,10 +121,10 @@ function updateUI() {
   renderTable(scoredWithOutliers, (name) => showDetails(name));
 }
 
-function buildComputedRow(source, raw, stats, ctx) {
+function buildComputedRow(source, raw, stats, ctx, suppressedMetrics = new Set()) {
   const normalized = computeNormalized(raw, stats, ctx);
   const weights = getWeights01();
-  const { score01, score100 } = computeScore(normalized, weights, METRICS);
+  const { score01, score100 } = computeScore(normalized, weights, METRICS, suppressedMetrics);
   const bandScores = distanceBandScores(safeNum(source.Range), raw.RangeScore, score01);
   const counter = counterScore({
     headDepNorm: normalized.HeadDep,

@@ -1,6 +1,34 @@
 import { DISTANCE_BANDS, OVERALL_HIT_WEIGHTS } from './constants.js';
 import { clamp, invert01, normalize, safeNum, stddev, weightedAverage } from './utils.js';
 
+const SUPPRESSION_LOG = new Set();
+let detectedWeightColumn = null;
+
+export function detectWeightColumn(rows = []) {
+  if (!rows.length) return null;
+
+  const keys = Object.keys(rows[0] || {});
+  const aliases = ['weight', 'mass', 'encumbrance'];
+  const found = keys.find((k) => aliases.some((alias) => k.toLowerCase().includes(alias)));
+
+  detectedWeightColumn = found || null;
+  const message = detectedWeightColumn
+    ? `Detected weight column: ${detectedWeightColumn}`
+    : 'No weight-like column detected in CSV schema';
+  console.log(message);
+
+  return detectedWeightColumn;
+}
+
+export function hasWeightColumn() {
+  return Boolean(detectedWeightColumn);
+}
+
+export function getWeight(row) {
+  if (!row || !hasWeightColumn()) return null;
+  return safeNum(row[detectedWeightColumn]);
+}
+
 export const METRICS = {
   TTK: {
     key: 'TTK',
@@ -84,21 +112,46 @@ export const METRICS = {
     label: 'Exposure Time',
     direction: 'lowerBetter',
     getRaw: (row, ctx) => {
-      const weight = safeNum(row.Weight);
+      const weight = getWeight(row);
       const agility = safeNum(row.Agility);
       const overallTTK = getZoneTTK(row, 'Overall', ctx.armor, ctx.hitWeights);
-      const weightFactor = ctx.weightRange ? normalize(weight, ctx.weightRange.min, ctx.weightRange.max) : null;
-      const mobilityCost = (typeof weight === 'number' && typeof agility === 'number' && agility > 0 && typeof overallTTK === 'number')
-        ? (weight / agility) * overallTTK
+      const reloadPenalty = reloadTax(safeNum(row.Reload), overallTTK) || 0;
+      const handlingIdx = handlingIndex(row);
+      const handlingNorm = ctx.handlingRange
+        ? normalize(handlingIdx, ctx.handlingRange.min, ctx.handlingRange.max)
         : null;
-      const exposure = (typeof overallTTK === 'number' && typeof weightFactor === 'number')
-        ? overallTTK * (1 + weightFactor)
+
+      if (ctx.hasWeight) {
+        const weightFactor = ctx.weightRange && typeof weight === 'number'
+          ? normalize(weight, ctx.weightRange.min, ctx.weightRange.max)
+          : null;
+        const mobilityCost = (typeof weight === 'number' && typeof agility === 'number' && agility > 0 && typeof overallTTK === 'number')
+          ? (weight / agility) * overallTTK
+          : null;
+        const exposure = (typeof overallTTK === 'number' && typeof weightFactor === 'number')
+          ? overallTTK * (1 + weightFactor)
+          : null;
+        return { exposure, mobilityCost, weightFactor, handlingNorm, overallTTK, reloadPenalty };
+      }
+
+      const exposure = typeof overallTTK === 'number'
+        ? overallTTK * (1 + reloadPenalty)
         : null;
-      return { exposure, mobilityCost, weightFactor };
+      const mobilityCost = (typeof overallTTK === 'number' && typeof handlingNorm === 'number')
+        ? overallTTK / (handlingNorm + 1e-6)
+        : null;
+
+      return { exposure, mobilityCost, weightFactor: null, handlingNorm, overallTTK, reloadPenalty };
     },
     format: (v) => (v && typeof v.exposure === 'number' ? formatSeconds(v.exposure) : '-'),
-    normalize: (raw, stats) => {
+    normalize: (raw, stats, ctx) => {
       if (!raw) return { ExposureTime: null, MobilityCost: null, WeightFactor: null };
+      if (!ctx?.hasWeight) {
+        const nExposure = defaultNormalize(raw.exposure, stats.ExposureTime);
+        const nMobilityCost = defaultNormalize(raw.mobilityCost, stats.MobilityCost);
+        return { ExposureTime: nExposure, MobilityCost: nMobilityCost, WeightFactor: null };
+      }
+
       const nExposure = defaultNormalize(raw.exposure, stats.ExposureTime);
       const nMobilityCost = defaultNormalize(raw.mobilityCost, stats.MobilityCost);
       return {
@@ -194,6 +247,8 @@ export function computeContext(rows, controls) {
   const categoryMaxRangeMap = {};
   const categoryMaxDpcMap = {};
   const weightValues = [];
+  const handlingValues = [];
+  const hasWeight = hasWeightColumn();
 
   rows.forEach((row) => {
     const category = row.Category || 'Unknown';
@@ -209,15 +264,22 @@ export function computeContext(rows, controls) {
       categoryMaxDpcMap[category] = Math.max(categoryMaxDpcMap[category] || 0, dpc);
     }
 
-    const weight = safeNum(row.Weight);
+    const weight = getWeight(row);
     if (typeof weight === 'number') weightValues.push(weight);
+
+    const handling = handlingIndex(row);
+    if (typeof handling === 'number') handlingValues.push(handling);
   });
 
   const weightRange = weightValues.length
     ? { min: Math.min(...weightValues), max: Math.max(...weightValues) }
     : null;
 
-  return { armor, zone, hitWeights, categoryMaxRangeMap, categoryMaxDpcMap, weightRange };
+  const handlingRange = handlingValues.length
+    ? { min: Math.min(...handlingValues), max: Math.max(...handlingValues) }
+    : null;
+
+  return { armor, zone, hitWeights, categoryMaxRangeMap, categoryMaxDpcMap, weightRange, handlingRange, hasWeight };
 }
 
 export function computeRawMetrics(row, ctx) {
@@ -259,11 +321,40 @@ export function computeStats(rawList) {
   return stats;
 }
 
-export function computeNormalized(raw, stats) {
+export function analyzeMissingMetrics(rows, threshold = 0.95) {
+  const missingCounts = {};
+  rows.forEach((row) => {
+    Object.entries(row.normalized || {}).forEach(([k, v]) => {
+      if (v === null || typeof v === 'undefined') {
+        missingCounts[k] = (missingCounts[k] || 0) + 1;
+      }
+    });
+  });
+
+  const total = rows.length || 1;
+  const missingRates = {};
+  const suppressed = new Set();
+
+  Object.entries(missingCounts).forEach(([key, count]) => {
+    const rate = count / total;
+    missingRates[key] = rate;
+    if (rate > threshold) {
+      suppressed.add(key);
+      if (!SUPPRESSION_LOG.has(key)) {
+        console.warn(`Suppressing metric ${key} from scoring/alerts (${(rate * 100).toFixed(1)}% missing)`);
+        SUPPRESSION_LOG.add(key);
+      }
+    }
+  });
+
+  return { missingCounts, missingRates, suppressed };
+}
+
+export function computeNormalized(raw, stats, ctx) {
   const normalized = {};
   Object.values(METRICS).forEach((metric) => {
     if (metric.key === 'ExposureTime') {
-      const result = metric.normalize(raw, stats);
+      const result = metric.normalize(raw, stats, ctx);
       normalized.ExposureTime = result?.ExposureTime ?? null;
       normalized.MobilityCost = result?.MobilityCost ?? null;
       normalized.WeightFactor = result?.WeightFactor ?? null;
@@ -300,7 +391,7 @@ export function computeNormalized(raw, stats) {
   return normalized;
 }
 
-export function computeScore(normalized, weights, registry = METRICS) {
+export function computeScore(normalized, weights, registry = METRICS, suppressed = new Set()) {
   const weightMap = {
     ttk: 'TTK',
     sustain: 'Sustain',
@@ -314,6 +405,7 @@ export function computeScore(normalized, weights, registry = METRICS) {
   let accum = 0;
   Object.entries(weightMap).forEach(([wKey, mKey]) => {
     const weight = weights[wKey] ?? 0;
+    if (suppressed.has(mKey)) return;
     const val = normalized[mKey];
     if (typeof val === 'number' && isFinite(val) && weight > 0) {
       weightSum += weight;
@@ -327,7 +419,7 @@ export function computeScore(normalized, weights, registry = METRICS) {
   return { score01, score100: Math.round(score01 * 1000) / 10 };
 }
 
-export function validateMetrics(rows, stats, weights) {
+export function validateMetrics(rows, stats, weights, missingAnalysis) {
   const warnings = [];
   let totalMetrics = 0;
   let okMetrics = 0;
@@ -344,9 +436,15 @@ export function validateMetrics(rows, stats, weights) {
     });
   });
 
+  const analysis = missingAnalysis || analyzeMissingMetrics(rows);
+  const suppressed = analysis.suppressed || new Set();
+  const missingRates = analysis.missingRates || {};
+
   Object.entries(missingCounts).forEach(([key, count]) => {
-    if (rows.length && count / rows.length > 0.3) {
-      warnings.push(`Metric ${key} missing ${(count / rows.length * 100).toFixed(1)}%`);
+    if (suppressed.has(key)) return;
+    const rate = missingRates[key] ?? (rows.length ? count / rows.length : 0);
+    if (rate > 0.3) {
+      warnings.push(`Metric ${key} missing ${(rate * 100).toFixed(1)}%`);
     }
   });
 
